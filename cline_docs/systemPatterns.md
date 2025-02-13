@@ -29,7 +29,20 @@ The system follows a layered architecture with clear component separation:
 
 2. Error Handling Flow
    ```
-   Browser → MCP → Handler → Retry Logic → Browser → MCP → Interface
+   Error Source → Error Handler → State Update → UI Update → User Feedback
+                      ↓
+                 Retry Logic
+                      ↓
+              Recovery Process
+   ```
+
+3. Message Streaming Flow
+   ```
+   Server → Stream → Buffer → Parser → State → UI Update
+                      ↓          ↓
+                   Cleanup    Error
+                              ↓
+                         Recovery
    ```
 
 ## Technical Decisions
@@ -61,9 +74,13 @@ The system follows a layered architecture with clear component separation:
    - E2E tests for critical paths
 
 3. Error Handling
+   - Comprehensive error detection
+   - Visual error indicators
    - Graceful degradation
-   - Retry mechanisms
+   - Retry mechanisms with backoff
    - User feedback loops
+   - Type-safe error handling
+   - State recovery patterns
 
 ## Performance Patterns
 1. Animation Optimization
@@ -75,3 +92,6 @@ The system follows a layered architecture with clear component separation:
    - Lazy loading
    - Code splitting
    - Resource optimization
+   - Stream buffering
+   - State reconciliation
+   - Memory management

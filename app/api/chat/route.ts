@@ -76,60 +76,77 @@ export async function POST(req: Request) {
 
         console.log('Starting stream with messageId:', messageId);
 
-        let heartbeatInterval: ReturnType<typeof setInterval>;
-        
         const processStream = async () => {
           try {
-            let lastChunkTime = Date.now();
-            const timeoutMs = 10000; // 10 seconds
-
-            // Setup heartbeat to keep connection alive
-            heartbeatInterval = setInterval(() => {
-              const heartbeat = `data: {"heartbeat": "${new Date().toISOString()}"}\n\n`;
-              controller.enqueue(encoder.encode(heartbeat));
-            }, 5000); // Send heartbeat every 5 seconds
-
             for await (const chunk of response) {
-              lastChunkTime = Date.now();
               console.log('Raw chunk:', chunk);
 
-              if (!chunk.choices?.[0]?.delta) {
-                console.warn('Received invalid chunk format:', chunk);
-                continue;
-              }
+              try {
+                // Only process valid chunks with content
+                if (chunk.choices?.[0]?.delta?.content) {
+                  const content = chunk.choices[0].delta.content;
+                  fullContent += content;
+                  
+                  console.log('Processing chunk:', {
+                    content,
+                    fullContent,
+                    messageId
+                  });
+                  
+                  // Send the current state
+                  const message = {
+                    id: messageId,
+                    role: "assistant",
+                    content: fullContent,
+                    createdAt: new Date().toISOString(),
+                  };
 
-              const content = chunk.choices[0].delta.content || "";
-              
-              if (content) {
-                fullContent += content;
-                console.log('Accumulated content:', fullContent);
+                  controller.enqueue(encoder.encode(`data: ${JSON.stringify(message)}\n\n`));
+                  console.log('Sent message update');
+                }
+              } catch (error) {
+                console.error('Error processing chunk:', error);
+                throw new Error('Failed to process response chunk');
+              }
+            }
+            
+            try {
+              // Ensure final message is sent
+              if (fullContent) {
+                console.log('Stream complete, sending final message');
                 
-                // Format message as expected by useChat
-                const message = {
+                const finalMessage = {
                   id: messageId,
                   role: "assistant",
                   content: fullContent,
                   createdAt: new Date().toISOString(),
+                  done: true
                 };
-
-                // Send as SSE
-                const sseMessage = `data: ${JSON.stringify(message)}\n\n`;
-                console.log('Sending SSE message:', sseMessage);
-                controller.enqueue(encoder.encode(sseMessage));
+                
+                controller.enqueue(encoder.encode(`data: ${JSON.stringify(finalMessage)}\n\n`));
+                console.log('Final message sent');
+              } else {
+                // If no content was received, send error message
+                const errorMessage = {
+                  id: messageId,
+                  role: "assistant",
+                  content: "I apologize, but I was unable to generate a response. Please try again.",
+                  createdAt: new Date().toISOString(),
+                  done: true,
+                  error: true
+                };
+                controller.enqueue(encoder.encode(`data: ${JSON.stringify(errorMessage)}\n\n`));
               }
-
-              // Check for timeout
-              if (Date.now() - lastChunkTime > timeoutMs) {
-                throw new Error("Stream timeout - no data received for 10 seconds");
-              }
+              
+              // Always send DONE marker
+              console.log('Sending DONE marker');
+              controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+            } catch (error) {
+              console.error('Error sending final messages:', error);
+              throw error;
             }
-
-            console.log('Stream completed successfully, sending [DONE] message');
-            clearInterval(heartbeatInterval);
-            controller.enqueue(encoder.encode("data: [DONE]\n\n"));
             controller.close();
           } catch (error) {
-            clearInterval(heartbeatInterval);
             console.error("Stream error:", error);
             const isTimeoutError = error instanceof Error && error.message === "Stream timeout";
             
@@ -140,15 +157,15 @@ export async function POST(req: Request) {
               return processStream();
             }
 
-            // If we've exhausted retries or hit a timeout, send an error message
+            // If we've exhausted retries or hit a timeout, send error message with done flag
             const errorMessage = {
               id: messageId,
               role: "assistant",
               content: "I apologize, but I encountered a connection issue. Please try your request again.",
               createdAt: new Date().toISOString(),
+              done: true
             };
             controller.enqueue(encoder.encode(`data: ${JSON.stringify(errorMessage)}\n\n`));
-            controller.enqueue(encoder.encode("data: [DONE]\n\n"));
             controller.close();
           }
         };
