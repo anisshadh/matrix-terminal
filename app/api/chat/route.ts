@@ -1,8 +1,9 @@
 import OpenAI from "openai";
 import { Message } from "ai";
 import { ChatCompletionMessageParam } from "openai/resources/chat/completions";
+import browserAutomation from "@/lib/browserAutomation";
 
-export const runtime = "edge";
+export const runtime = "nodejs";
 
 const client = new OpenAI({
   apiKey: process.env.GROQ_API_KEY,
@@ -54,13 +55,125 @@ export async function POST(req: Request) {
 
     console.log('Starting chat completion with messages:', JSON.stringify(apiMessages, null, 2));
 
-    const response = await client.chat.completions.create({
+    let response = await client.chat.completions.create({
       model: "llama-3.3-70b-versatile",
       messages: apiMessages,
-      temperature: 0.8, // Ensuring temperature is a float32 > 0
+      temperature: 0.8,
       stream: true,
-      n: 1, // Explicitly set to 1 as required by Groq
+      n: 1,
+      tools: [
+        {
+          type: "function",
+          function: {
+            name: "run_browser_automation",
+            description: "Automate browser actions like navigation, clicking, and typing",
+            parameters: {
+              type: "object",
+              properties: {
+                action: {
+                  type: "string",
+                  enum: ["navigate", "click", "type"],
+                  description: "The type of browser action to perform"
+                },
+                url: {
+                  type: "string",
+                  description: "The URL to navigate to (required for navigate action)"
+                },
+                selector: {
+                  type: "string",
+                  description: "CSS selector for the target element (required for click and type actions)"
+                },
+                value: {
+                  type: "string",
+                  description: "Text to type (required for type action)"
+                },
+                visible: {
+                  type: "boolean",
+                  description: "Whether to show the browser window (defaults to true)",
+                  default: true
+                }
+              },
+              required: ["action"]
+            }
+          }
+        }
+      ],
+      tool_choice: "auto"
     });
+
+    // For non-streaming request to check for tool calls
+    const toolCheckResponse = await client.chat.completions.create({
+      model: "llama-3.3-70b-versatile",
+      messages: apiMessages,
+      temperature: 0.8,
+      stream: false,
+      n: 1,
+      tools: [
+        {
+          type: "function",
+          function: {
+            name: "run_browser_automation",
+            description: "Automate browser actions like navigation, clicking, and typing",
+            parameters: {
+              type: "object",
+              properties: {
+                action: {
+                  type: "string",
+                  enum: ["navigate", "click", "type"],
+                  description: "The type of browser action to perform"
+                },
+                url: {
+                  type: "string",
+                  description: "The URL to navigate to (required for navigate action)"
+                },
+                selector: {
+                  type: "string",
+                  description: "CSS selector for the target element (required for click and type actions)"
+                },
+                value: {
+                  type: "string",
+                  description: "Text to type (required for type action)"
+                }
+              },
+              required: ["action"]
+            }
+          }
+        }
+      ],
+      tool_choice: "auto"
+    });
+
+    // Handle tool calls if present
+    const toolCall = toolCheckResponse.choices[0]?.message?.tool_calls?.[0];
+    if (toolCall?.function?.name === "run_browser_automation") {
+      try {
+        const params = {
+        ...JSON.parse(toolCall.function.arguments),
+        visible: true // Always use visible mode for better user experience
+      };
+        const result = await browserAutomation.execute(params);
+        
+        // Add the tool result to the messages
+        apiMessages.push({
+          role: "assistant",
+          content: result.success 
+            ? `Browser automation successful: ${result.message}`
+            : `Browser automation failed: ${result.error}`
+        });
+        
+        // Get a follow-up streaming response
+        response = await client.chat.completions.create({
+          model: "llama-3.3-70b-versatile",
+          messages: apiMessages,
+          temperature: 0.8,
+          stream: true,
+          n: 1
+        });
+      } catch (error) {
+        console.error("Error executing browser automation:", error);
+        throw error;
+      }
+    }
 
     console.log('Got streaming response from Groq');
 
@@ -83,8 +196,8 @@ export async function POST(req: Request) {
 
               try {
                 // Only process valid chunks with content
-                if (chunk.choices?.[0]?.delta?.content) {
-                  const content = chunk.choices[0].delta.content;
+                const content = chunk.choices?.[0]?.delta?.content;
+                if (content) {
                   fullContent += content;
                   
                   console.log('Processing chunk:', {
