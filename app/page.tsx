@@ -71,15 +71,38 @@ const MatrixCode = () => {
 }
 
 export default function MatrixControlCenter() {
-  const { messages, input, handleInputChange, handleSubmit } = useChat()
+  const { messages, input, handleInputChange, handleSubmit, isLoading } = useChat({
+    api: "/api/chat",
+    onResponse: (response) => {
+      console.log("Chat response received:", response);
+    },
+    onFinish: (message) => {
+      console.log("Chat finished with message:", message);
+      setIsTyping(false);
+    },
+    onError: (error) => {
+      console.error("Chat error:", error);
+      setIsTyping(false);
+    }
+  })
   const [isTyping, setIsTyping] = useState(false)
   const [connectionStatus, setConnectionStatus] = useState("Connected")
   const [systemMessage, setSystemMessage] = useState("")
 
-  const onSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  // Log messages whenever they change
+  useEffect(() => {
+    console.log("Messages updated:", messages);
+  }, [messages]);
+
+  const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
+    console.log("Submitting message:", input);
     setIsTyping(true)
-    handleSubmit(e).finally(() => setIsTyping(false))
+    try {
+      await handleSubmit(e)
+    } catch (error) {
+      console.error("Submit error:", error)
+    }
   }
 
   useEffect(() => {
@@ -111,7 +134,7 @@ export default function MatrixControlCenter() {
         <header className="border-b border-[#00FF00] border-opacity-50 p-4 flex justify-between items-center">
           <div className="flex items-center gap-2">
             <span className="text-[#00FF00] animate-blink text-2xl">{">"}</span>
-            <h1 className="text-2xl uppercase tracking-wider font-bold">Matrix Control Center</h1>
+            <h1 className="text-2xl uppercase tracking-wider font-bold">Matrix  Terminal</h1>
           </div>
           <div className="flex items-center gap-2">
             <Wifi className="w-5 h-5 animate-pulse" />
@@ -171,4 +194,3 @@ export default function MatrixControlCenter() {
     </div>
   )
 }
-

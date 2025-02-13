@@ -1,0 +1,135 @@
+# Project Rules and Patterns
+
+## Project Structure
+- All new files must follow the established folder structure:
+  ```
+  /pages          # Next.js pages and API routes
+  /components     # UI components
+  /hooks          # Custom hooks
+  /styles         # Global styles
+  /lib           # Utilities
+  /tests         # Testing
+  /documentation # Documentation
+  ```
+- Component files must use .tsx extension
+- Utility files must use .ts extension
+- Test files must follow *.test.tsx naming pattern
+
+## Matrix Aesthetic Guidelines
+- Colors:
+  - Background: AMOLED Black (#000000)
+  - Accent: Matrix Green (#00FF00)
+  - Text: Pure White (#FFFFFF)
+- Font: Monospace for terminal-like appearance
+- Animations: Digital effects with matrix-style transitions
+- Components must maintain consistent styling across all interfaces
+
+## Tool Usage
+- Tailwind CSS for styling
+  - Use utility classes
+  - Avoid custom CSS unless necessary
+- Simple-AI.dev components
+  - Extend rather than modify
+  - Maintain consistent props interface
+- Next.js API routes
+  - Implement proper error handling
+  - Use appropriate HTTP methods
+  - Handle streaming responses
+
+
+Remember: The Memory Bank is the source of truth for all project knowledge. Keep it updated and refer to it regularly.
+
+```tsx
+"use server"
+
+import SomeClientComponent from "./_components/some-client-component"
+
+// In this case, no asynchronous work is being done, so no Suspense or fallback is required.
+export default async function ExampleServerPage() {
+  return <SomeClientComponent initialData={[]} />
+}
+```
+
+Example of a server component:
+
+```tsx
+"use server"
+
+interface ExampleServerComponentProps {
+  // Your props here
+}
+
+export async function ExampleServerComponent({
+  props
+}: ExampleServerComponentProps) {
+  // Your code here
+}
+```
+
+##### Client Components
+
+- Use `"use client"` at the top of the file
+- Client components can safely rely on props passed down from server components, or handle UI interactions without needing <Suspense> if there’s no async logic.
+
+Example of a client page:
+
+```tsx
+"use client"
+
+export default function ExampleClientPage() {
+  // Your code here
+}
+```
+
+Example of a client component:
+
+```tsx
+"use client"
+
+interface ExampleClientComponentProps {
+  initialData: any[]
+}
+
+export default function ExampleClientComponent({
+  initialData
+}: ExampleClientComponentProps) {
+  // Client-side logic here
+  return <div>{initialData.length} items</div>
+}
+```
+
+### Package Management Rules
+
+- Use `npm install --legacy-peer-deps` for all package installations
+- All packages must be installed with legacy peer dependencies
+
+### File Modification Rules
+
+- Do not modify `.env.local` - request changes from the project owner
+- Do not modify `.clinerules` or `.cursorrules`files
+- Do not modify `/documentation` folder under any circumstances
+
+### Development Rules
+
+- Fix lint errors immediately when they appear
+
+### Code Implementation Guidelines
+Don’t get lazy, ensure you do the complete implementation
+When doing any implementation, ensure you do the full thorough implementation in the code base, use chain of thought reasoning, and take it step by step. 
+
+### Error Handling Rules
+When you encounter an error use step by step Use Chain of thought reasoning to find the core issue of this error, then create a step by step plan to fix the error and then implement the changes.
+
+### Loop encounter
+
+When you encounter a loop or a severe error, first, think for ten paragraphs about what's going on here + the best way to do this, and then implement the code.
+
+### Test Files - CRITICAL
+
+MANDATORY: All test files MUST be deleted immediately after test completion. NO EXCEPTIONS.
+Failure to comply will compromise codebase integrity and organization.
+
+Security
+Never read or modify .env files
+Keep credentials out of logs
+

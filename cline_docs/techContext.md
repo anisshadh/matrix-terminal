@@ -28,7 +28,11 @@
 ### Backend
 1. API Integration
    - Next.js API routes
-   - Grok/OpenRouter API connection
+   - Groq API integration
+     - LLaMA 3.3 70B model
+     - Streaming responses
+     - Error recovery system
+     - Heartbeat mechanism
    - Simple AI platform integration
 
 2. Browser Automation
@@ -41,6 +45,7 @@
 /
 ├── app/                 # Next.js app directory
 │   ├── api/            # API routes
+│   │   └── chat/      # Chat endpoint
 │   ├── fonts/          # Custom fonts
 │   └── globals.css     # Global styles
 ├── components/         # React components
@@ -59,6 +64,7 @@
    - typescript
    - shadcn/ui components
    - Simple AI components
+   - openai (for Groq API)
 
 2. Development Dependencies
    - eslint
@@ -75,17 +81,21 @@
    - Smooth animations (60fps target)
    - Responsive UI interactions
    - Efficient state management
+   - Low-latency streaming responses
 
 3. Security Considerations
    - API key management
    - Safe browser automation
    - Input validation
+   - CORS configuration
 
 ## Development Workflow
 1. Local Development
    - `npm run dev` for development server
    - Hot module replacement enabled
    - TypeScript type checking
+   - Environment variables required:
+     - GROQ_API_KEY
 
 2. Build Process
    - TypeScript compilation
