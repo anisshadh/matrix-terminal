@@ -30,6 +30,7 @@
    - Next.js API routes
    - Groq API integration
      - LLaMA 3.3 70B model
+     - Tool use functionality
      - Enhanced streaming response system
        - Buffer management
        - State reconciliation
@@ -44,9 +45,14 @@
    - Simple AI platform integration
 
 2. Browser Automation
-   - Playwright MCP server
-   - Chromium browser support
-   - Custom error retry system
+   - Playwright for browser control
+     - Chromium browser support
+     - Visible mode for user feedback
+     - Session persistence
+     - Action-based interface
+   - Integration with Groq API tools
+   - Custom error handling and recovery
+   - Resource cleanup management
 
 ## Project Structure
 ```
@@ -59,6 +65,7 @@
 ├── components/         # React components
 │   └── ui/            # UI components
 ├── lib/               # Utility functions
+│   └── browserAutomation.ts  # Browser automation module
 ├── docs/              # Documentation
 └── cline_docs/        # Memory Bank
 ```
@@ -73,6 +80,7 @@
    - shadcn/ui components
    - Simple AI components
    - openai (for Groq API)
+   - playwright (for browser automation)
 
 2. Development Dependencies
    - eslint
@@ -84,6 +92,7 @@
 1. Browser Support
    - Modern browsers only
    - Chromium-based browsers for automation
+   - System must support GUI for visible browser mode
 
 2. Performance Requirements
    - Smooth animations (60fps target)
@@ -92,10 +101,14 @@
    - Low-latency streaming responses
    - Memory-efficient stream processing
    - Optimized message reconciliation
+   - Browser resource management
 
 3. Security Considerations
    - API key management
    - Safe browser automation
+     - Sandboxed browser instances
+     - Resource cleanup
+     - Action validation
    - Input validation
    - CORS configuration
    - Error message sanitization
@@ -108,13 +121,18 @@
    - TypeScript type checking
    - Environment variables required:
      - GROQ_API_KEY
+   - Browser automation prerequisites:
+     - Playwright installation
+     - Chromium browser binaries
 
 2. Build Process
    - TypeScript compilation
    - CSS processing
    - Code optimization
+   - Browser automation setup
 
 3. Deployment
    - Production build generation
    - Static asset optimization
    - Environment configuration
+   - Browser automation dependencies

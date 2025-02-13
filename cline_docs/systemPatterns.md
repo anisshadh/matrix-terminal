@@ -16,15 +16,15 @@ The system follows a layered architecture with clear component separation:
    - Response generation
 
 3. Browser Control Layer
-   - Playwright MCP integration
-   - Action execution
-   - Result handling
+   - Playwright integration for browser automation
+   - Visible browser feedback
+   - Action execution and persistence
    - Error recovery
 
 ## Communication Patterns
 1. Message Flow
    ```
-   User → Interface → AI → MCP → Browser → Result Handler → Interface → User
+   User → Interface → AI → Browser Automation → Result Handler → Interface → User
    ```
 
 2. Error Handling Flow
@@ -45,6 +45,13 @@ The system follows a layered architecture with clear component separation:
                          Recovery
    ```
 
+4. Browser Automation Flow
+   ```
+   AI Command → Tool Use → Browser Launch → Action Execution → Visual Feedback
+                  ↓             ↓                ↓                ↓
+            Param Validation  Visible Mode    State Update    User Confirmation
+   ```
+
 ## Technical Decisions
 1. Framework Selection
    - Next.js for robust full-stack capabilities
@@ -54,13 +61,20 @@ The system follows a layered architecture with clear component separation:
 
 2. Integration Patterns
    - API Routes for backend communication
-   - MCP for browser automation
+   - Groq API tool use for browser automation
+   - Playwright for browser control
    - Simple AI components for AI integration
 
 3. State Management
    - React hooks for local state
    - API-based data fetching
    - Real-time updates
+
+4. Browser Automation
+   - Singleton pattern for browser instance
+   - Visible mode for user feedback
+   - Persistent browser sessions
+   - Action-based interface (navigate, click, type)
 
 ## Development Patterns
 1. Component Structure
@@ -72,6 +86,7 @@ The system follows a layered architecture with clear component separation:
    - Unit tests for components
    - Integration tests for flows
    - E2E tests for critical paths
+   - Browser automation testing
 
 3. Error Handling
    - Comprehensive error detection
@@ -81,6 +96,7 @@ The system follows a layered architecture with clear component separation:
    - User feedback loops
    - Type-safe error handling
    - State recovery patterns
+   - Browser session recovery
 
 ## Performance Patterns
 1. Animation Optimization
@@ -95,3 +111,10 @@ The system follows a layered architecture with clear component separation:
    - Stream buffering
    - State reconciliation
    - Memory management
+   - Browser resource cleanup
+
+3. Browser Automation Optimization
+   - Session persistence
+   - Resource cleanup on completion
+   - Error state recovery
+   - Memory management for long-running sessions
