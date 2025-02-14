@@ -4,7 +4,7 @@ import { logger } from './logger';
 export interface AutomationEvent {
   id: string;
   timestamp: number;
-  type: 'INIT' | 'NAVIGATE' | 'CLICK' | 'TYPE' | 'SUCCESS' | 'ERROR' | 'CLEANUP';
+  type: 'INIT' | 'NAVIGATE' | 'CLICK' | 'TYPE' | 'SUCCESS' | 'ERROR' | 'CLEANUP' | 'VISUAL_VERIFICATION';
   data?: any;
   error?: string;
 }
