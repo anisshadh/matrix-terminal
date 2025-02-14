@@ -33,11 +33,38 @@ export class BrowserAutomation {
 
   private async initBrowser(retryCount = 0, maxRetries = 3): Promise<void> {
     try {
-      logger.debug('Initializing browser automation', { retryCount });
+      logger.debug('Initializing browser automation', { retryCount, keepOpen: this.keepOpen });
 
-      // Always close existing browser instance before creating a new one
+      // Check if we can reuse existing browser and page
+      if (this.keepOpen && this.browser && this.page) {
+        try {
+          // Check if page is still usable
+          if (!this.page.isClosed()) {
+            logger.debug('Reusing existing browser and page');
+            return;
+          }
+          logger.debug('Existing page is closed, will create new page');
+          // If page is closed but browser is still good, just create new page
+          if (this.browser.isConnected()) {
+            const context = await this.browser.newContext({
+              viewport: { width: 1280, height: 720 }
+            });
+            this.page = await context.newPage();
+            this.setupPageListeners();
+            return;
+          }
+        } catch (error) {
+          logger.debug('Error checking browser/page state, will reinitialize', error);
+        }
+      }
+
+      // Close existing browser if it exists and we couldn't reuse it
       if (this.browser) {
-        await this.browser.close();
+        try {
+          await this.browser.close();
+        } catch (error) {
+          logger.debug('Error closing existing browser', error);
+        }
         this.browser = null;
         this.page = null;
       }
@@ -67,20 +94,7 @@ export class BrowserAutomation {
       this.page = await context.newPage();
       logger.debug('Created new browser page');
 
-      // Set default timeout
-      this.page.setDefaultTimeout(15000);
-      
-      // Listen for console messages
-      this.page.on('console', msg => {
-        const type = msg.type();
-        const text = msg.text();
-        logger.debug(`Browser console [${type}]:`, text);
-      });
-
-      // Listen for errors
-      this.page.on('pageerror', error => {
-        logger.error('Browser page error:', error);
-      });
+      this.setupPageListeners();
     } catch (error) {
       const errorMessage = `Failed to initialize browser: ${error instanceof Error ? error.message : 'Unknown error'}`;
       logger.error(errorMessage, error instanceof Error ? error : undefined);
@@ -88,13 +102,35 @@ export class BrowserAutomation {
     }
   }
 
+  private setupPageListeners(): void {
+    if (!this.page) return;
+
+    // Set default timeout
+    this.page.setDefaultTimeout(15000);
+    
+    // Listen for console messages
+    this.page.on('console', msg => {
+      const type = msg.type();
+      const text = msg.text();
+      logger.debug(`Browser console [${type}]:`, text);
+    });
+
+    // Listen for errors
+    this.page.on('pageerror', error => {
+      logger.error('Browser page error:', error);
+    });
+  }
+
   private async cleanup(): Promise<void> {
     try {
+      // Only cleanup if keepOpen is false
       if (this.browser && !this.keepOpen) {
         logger.debug('Cleaning up browser instance');
         await this.browser.close();
         this.browser = null;
         this.page = null;
+      } else {
+        logger.debug('Skipping cleanup due to keepOpen flag');
       }
     } catch (error) {
       logger.error('Error during browser cleanup:', error instanceof Error ? error : new Error('Unknown error'));
@@ -214,19 +250,6 @@ export class BrowserAutomation {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       logger.error('Browser automation error:', error instanceof Error ? error : new Error(errorMessage));
       
-      // Take a screenshot on error if page is available
-      if (this.page) {
-        try {
-          const screenshotPath = 'automation-error.png';
-          await this.page.screenshot({ 
-            path: screenshotPath,
-            fullPage: true 
-          });
-          logger.info(`Error screenshot saved to: ${screenshotPath}`);
-        } catch (screenshotError) {
-          logger.error('Failed to capture error screenshot:', screenshotError instanceof Error ? screenshotError : new Error('Unknown error'));
-        }
-      }
       
       return {
         success: false,

@@ -1,146 +1,71 @@
 # System Patterns
 
-## Error Handling
-1. Custom Error Classes
-   - Base `ChatError` class with messageId and details
-   - Specialized error types (ValidationError, AutomationError, StreamError)
-   - Consistent error structure across the application
-   - Proper error inheritance and type checking
+## Architecture Overview
+The system follows a modular architecture with clear separation of concerns:
+- Next.js backend for API handling and routing
+- Playwright for browser automation
+- OpenAI integration for AI-driven interactions
 
-2. Error Recovery
-   - Retry mechanisms for transient failures
-   - Graceful degradation when features are unavailable
-   - Detailed error logging for debugging
-   - User-friendly error messages
+## Core Components
 
-## Logging
-1. Centralized Logger
-   - Singleton pattern for consistent logging
-   - Multiple log levels (debug, info, warn, error)
-   - Structured log format with timestamps
-   - Log rotation to prevent memory issues
+### Browser Automation
+The BrowserAutomation class implements a singleton pattern with persistent browser management:
+- Maintains a single browser instance when visual feedback is required
+- Implements state validation and recovery mechanisms
+- Uses event listeners for console and error monitoring
+- Provides cleanup strategies based on persistence requirements
 
-2. Log Categories
-   - Browser automation logs
-   - Chat/LLM interaction logs
-   - Error logs with stack traces
-   - Performance metrics
+#### Key Patterns:
+1. Singleton Instance
+   - Single point of access for browser automation
+   - Manages browser lifecycle consistently
 
-## Browser Automation
-1. Element Interaction
-   - Wait for element visibility
-   - Scroll elements into view
-   - Verify element properties
-   - Handle dynamic content loading
+2. State Management
+   - Validates browser and page states
+   - Recovers from failures automatically
+   - Maintains persistence when required
 
-2. Selector Strategy
-   - Multiple selector fallbacks
-   - Role-based selectors
-   - Attribute-based selectors
-   - Text-based selectors
+3. Error Handling
+   - Comprehensive error catching and logging
+   - Graceful degradation on failures
+   - Detailed error reporting
 
-## Command Processing
-1. Smart Command Parsing
-   - AI-driven natural language understanding
-   - Dynamic action inference
-   - Chained command support
-   - Flexible pattern recognition
-   - Fallback mechanisms for ambiguous inputs
+### Command Processing
+- Parses and validates automation commands
+- Integrates with AI for command interpretation
+- Maintains consistent command execution patterns
 
-2. Command Execution
-   - Sequential action processing
-   - Automated context handling
-   - Tool call integration
-   - Result validation and error recovery
+### Logging System
+- Hierarchical logging with debug, info, and error levels
+- Context-aware logging for better debugging
+- Performance monitoring capabilities
 
-3. Command Structure
-   - Action-based architecture
-   - Standardized automation interfaces
-   - Extensible command patterns
-   - Robust validation schemas
+## Design Decisions
 
-## API Communication
-1. Stream Handling
-   - Chunked response processing
-   - Retry logic for failed streams
-   - Error recovery
-   - Progress tracking
+### Browser Persistence
+- Browser window remains open when visible=true
+- State is maintained across automation requests
+- Cleanup only occurs when persistence isn't required
 
-2. Message Processing
-   - Message validation
-   - Content filtering
-   - Response formatting
-   - Error handling
+### Error Recovery
+- Automatic recovery from page crashes
+- New page creation in existing browser when possible
+- Fallback to new browser instance when needed
 
-## Testing
-1. End-to-End Tests
-   - Browser automation testing
-   - Chat interface testing
-   - Error scenario testing
-   - Performance testing
-
-2. Test Cleanup
-   - Automatic resource cleanup
-   - Screenshot capture on failure
-   - Log collection
-   - State reset between tests
-
-## Code Organization
-1. Module Structure
-   - Feature-based organization
-   - Clear separation of concerns
-   - Dependency injection
-   - Interface-based design
-
-2. File Structure
-   ```
-   /lib
-     /browserAutomation.ts  - Browser control
-     /commandParser.ts      - Command processing
-     /errors.ts            - Error definitions
-     /logger.ts           - Logging system
-   /app
-     /api
-       /chat
-         /route.ts        - Chat API endpoint
-   /tests
-     /e2e                - End-to-end tests
-   ```
+### Performance Optimization
+- Reuse of browser instances
+- Efficient state management
+- Minimal resource usage
 
 ## Best Practices
-1. Error Handling
-   - Always use custom error classes
-   - Include context in error messages
-   - Log errors with stack traces
-   - Provide user-friendly messages
-
-2. Logging
-   - Log at appropriate levels
-   - Include relevant context
-   - Use structured logging
-   - Rotate logs regularly
-
-3. Browser Automation
-   - Wait for elements properly
-   - Handle dynamic content
-   - Clean up resources
-   - Take screenshots on failure
-
-4. Testing
-   - Test error scenarios
-   - Clean up after tests
-   - Use meaningful assertions
-   - Document test cases
+1. Always validate browser and page states before use
+2. Implement proper cleanup procedures
+3. Maintain detailed logging for debugging
+4. Handle errors gracefully with recovery mechanisms
+5. Consider resource management in persistent sessions
 
 ## Future Considerations
-1. Scalability
-   - Log persistence
-   - Metrics collection
-   - Performance optimization
-   - Caching strategies
-
-2. Maintainability
-   - Documentation updates
-   - Code reviews
-   - Regular testing
-   - Performance monitoring
+- Implement graceful shutdown procedures
+- Add memory management optimizations
+- Expand automation capabilities
+- Enhance error recovery mechanisms

@@ -1,138 +1,75 @@
 # Technical Context
 
-## Development Environment
-- Next.js 14+ with App Router
-- TypeScript for type safety
-- Node.js runtime environment
-- VSCode as primary IDE
+## Technology Stack
 
-## Core Technologies
+### Core Technologies
+- Next.js 14 (React Framework)
+- TypeScript
+- Playwright (Browser Automation)
+- OpenAI API Integration
 
-### Frontend
-1. Framework & Language
-   - Next.js with TypeScript
-   - React 18+ with hooks
-   - ES6+ JavaScript features
+### Development Tools
+- Node.js
+- npm (with legacy peer dependencies)
+- VSCode
 
-2. Styling & UI
-   - Tailwind CSS for styling
-   - shadcn/ui component library
-   - Custom Matrix theme effects
-   - GeistMono and Geist fonts
+## Implementation Details
 
-3. Build Tools
-   - PostCSS for CSS processing
-   - ESLint for code quality
-   - TypeScript compiler
+### Browser Automation
+The system uses Playwright's Chromium implementation with the following key features:
+- Persistent browser sessions with state management
+- Event-driven page monitoring
+- Automatic recovery mechanisms
+- Configurable visibility settings
 
-### Backend
-1. API Integration
-   - Next.js API routes
-   - Groq API integration
-     - LLaMA 3.3 70B model
-     - Tool use functionality
-     - Enhanced streaming response system
-       - Buffer management
-       - State reconciliation
-       - Cleanup handlers
-     - Comprehensive error handling
-       - Visual error states
-       - Type-safe error processing
-       - Recovery mechanisms
-     - Message state management
-       - Real-time updates
-       - State consistency
-   - Simple AI platform integration
-
-2. Browser Automation
-   - Playwright for browser control
-     - Chromium browser support
-     - Visible mode for user feedback
-     - Session persistence
-     - Action-based interface
-   - Integration with Groq API tools
-   - Custom error handling and recovery
-   - Resource cleanup management
-
-## Project Structure
-```
-/
-├── app/                 # Next.js app directory
-│   ├── api/            # API routes
-│   │   └── chat/      # Chat endpoint
-│   ├── fonts/          # Custom fonts
-│   └── globals.css     # Global styles
-├── components/         # React components
-│   └── ui/            # UI components
-├── lib/               # Utility functions
-│   └── browserAutomation.ts  # Browser automation module
-├── docs/              # Documentation
-└── cline_docs/        # Memory Bank
+#### Browser Management
+```typescript
+class BrowserAutomation {
+  private browser: Browser | null = null;
+  private page: Page | null = null;
+  private keepOpen: boolean = false;
+}
 ```
 
-## Dependencies
-1. Production Dependencies
-   - next
-   - react
-   - react-dom
-   - tailwindcss
-   - typescript
-   - shadcn/ui components
-   - Simple AI components
-   - openai (for Groq API)
-   - playwright (for browser automation)
+Key implementation aspects:
+- Singleton pattern for consistent browser management
+- State validation for browser and page instances
+- Conditional cleanup based on persistence requirements
+- Error recovery with automatic page/browser recreation
 
-2. Development Dependencies
-   - eslint
-   - postcss
-   - typescript compiler
-   - tailwind plugins
+### API Integration
+- OpenAI API for command interpretation
+- Streaming responses for real-time feedback
+- Error handling with detailed logging
+
+## Configuration
+
+### Browser Settings
+- Viewport: 1280x720
+- Default timeout: 15000ms
+- Headless mode: Conditional based on visibility requirements
+- Sandbox settings: Configured for security
+
+### Development Setup
+- Use `npm install --legacy-peer-deps` for package installation
+- Environment variables required:
+  - GROQ_API_KEY for AI integration
+  - Other configuration in .env.local (protected)
 
 ## Technical Constraints
-1. Browser Support
-   - Modern browsers only
-   - Chromium-based browsers for automation
-   - System must support GUI for visible browser mode
+- Browser persistence requires proper state management
+- Memory usage must be monitored in persistent sessions
+- Error handling must maintain system stability
+- Performance considerations with long-running browser sessions
 
-2. Performance Requirements
-   - Smooth animations (60fps target)
-   - Responsive UI interactions
-   - Efficient state management
-   - Low-latency streaming responses
-   - Memory-efficient stream processing
-   - Optimized message reconciliation
-   - Browser resource management
+## Debugging
+- Comprehensive logging system
+- Browser console monitoring
+- Error tracking with context
+- Performance monitoring capabilities
 
-3. Security Considerations
-   - API key management
-   - Safe browser automation
-     - Sandboxed browser instances
-     - Resource cleanup
-     - Action validation
-   - Input validation
-   - CORS configuration
-   - Error message sanitization
-   - State management security
-
-## Development Workflow
-1. Local Development
-   - `npm run dev` for development server
-   - Hot module replacement enabled
-   - TypeScript type checking
-   - Environment variables required:
-     - GROQ_API_KEY
-   - Browser automation prerequisites:
-     - Playwright installation
-     - Chromium browser binaries
-
-2. Build Process
-   - TypeScript compilation
-   - CSS processing
-   - Code optimization
-   - Browser automation setup
-
-3. Deployment
-   - Production build generation
-   - Static asset optimization
-   - Environment configuration
-   - Browser automation dependencies
+## Future Technical Considerations
+- Memory optimization for persistent sessions
+- Enhanced state management
+- Additional automation capabilities
+- Performance monitoring tools
