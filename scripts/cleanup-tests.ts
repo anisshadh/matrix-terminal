@@ -10,8 +10,10 @@ async function cleanupTests() {
   const projectRoot = join(__dirname, '..');
   const testFiles = [
     'test-failure.png',
+    'automation-error.png',
     'playwright-report',
-    'test-results'
+    'test-results',
+    'tests/e2e/advanced-automation.test.ts'
   ];
 
   for (const file of testFiles) {

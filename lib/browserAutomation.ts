@@ -31,37 +31,56 @@ export class BrowserAutomation {
   private page: Page | null = null;
   private keepOpen: boolean = false;
 
-  private async initBrowser() {
+  private async initBrowser(retryCount = 0, maxRetries = 3): Promise<void> {
     try {
-      logger.debug('Initializing browser automation');
-      
-      if (!this.browser) {
-        logger.debug('Launching new browser instance', { headless: !this.keepOpen });
+      logger.debug('Initializing browser automation', { retryCount });
+
+      // Always close existing browser instance before creating a new one
+      if (this.browser) {
+        await this.browser.close();
+        this.browser = null;
+        this.page = null;
+      }
+
+      logger.debug('Launching new browser instance', { headless: !this.keepOpen });
+      try {
         this.browser = await chromium.launch({
           headless: !this.keepOpen,
           args: ['--no-sandbox', '--disable-setuid-sandbox']
         });
+      } catch (error) {
+        if (retryCount < maxRetries) {
+          logger.warn(`Browser launch failed, retrying (${retryCount + 1}/${maxRetries})...`, error);
+          await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)));
+          return this.initBrowser(retryCount + 1, maxRetries);
+        }
+        throw error;
+      }
+
+      if (!this.browser) {
+        throw new Error('Failed to initialize browser');
       }
       
-      if (!this.page) {
-        const context = await this.browser.newContext({
-          viewport: { width: 1280, height: 720 }
-        });
-        this.page = await context.newPage();
-        logger.debug('Created new browser page');
-        
-        // Listen for console messages
-        this.page.on('console', msg => {
-          const type = msg.type();
-          const text = msg.text();
-          logger.debug(`Browser console [${type}]:`, text);
-        });
+      const context = await this.browser.newContext({
+        viewport: { width: 1280, height: 720 }
+      });
+      this.page = await context.newPage();
+      logger.debug('Created new browser page');
 
-        // Listen for errors
-        this.page.on('pageerror', error => {
-          logger.error('Browser page error:', error);
-        });
-      }
+      // Set default timeout
+      this.page.setDefaultTimeout(15000);
+      
+      // Listen for console messages
+      this.page.on('console', msg => {
+        const type = msg.type();
+        const text = msg.text();
+        logger.debug(`Browser console [${type}]:`, text);
+      });
+
+      // Listen for errors
+      this.page.on('pageerror', error => {
+        logger.error('Browser page error:', error);
+      });
     } catch (error) {
       const errorMessage = `Failed to initialize browser: ${error instanceof Error ? error.message : 'Unknown error'}`;
       logger.error(errorMessage, error instanceof Error ? error : undefined);
@@ -69,7 +88,7 @@ export class BrowserAutomation {
     }
   }
 
-  private async cleanup() {
+  private async cleanup(): Promise<void> {
     try {
       if (this.browser && !this.keepOpen) {
         logger.debug('Cleaning up browser instance');
@@ -82,7 +101,7 @@ export class BrowserAutomation {
     }
   }
 
-  async execute(params: BrowserAutomationParams): Promise<AutomationResult> {
+  public async execute(params: BrowserAutomationParams): Promise<AutomationResult> {
     logger.info('Executing browser automation', params);
     
     try {
@@ -224,7 +243,7 @@ export class BrowserAutomation {
     }
   }
 
-  private validateParams(params: BrowserAutomationParams) {
+  private validateParams(params: BrowserAutomationParams): void {
     logger.debug('Validating automation parameters', params);
     
     if (!params.action) {

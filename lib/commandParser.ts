@@ -9,13 +9,25 @@ const MessageSchema = z.object({
 
 const MessagesSchema = z.array(MessageSchema);
 
+// Keywords for command detection
+const KEYWORDS = {
+  GREETING: ['hi', 'hello', 'hey', 'greetings'],
+  NAVIGATION: ['go', 'open', 'navigate', 'visit', 'browse', 'load', 'show'],
+  SEARCH: ['search', 'find', 'lookup', 'look up'],
+  CLICK: ['click', 'press', 'select', 'choose'],
+  TYPE: ['type', 'enter', 'input', 'write']
+} as const;
+
+// URL pattern for detecting web addresses
+const URL_PATTERN = /(?:https?:\/\/)?(?:www\.)?[a-zA-Z0-9-]+(?:\.[a-zA-Z]{2,})+(?:\/[^\s]*)?/i;
+
 // Command patterns for parsing
 const COMMAND_PATTERNS = {
-  GREETING: /^(hi|hello|hey|greetings)$/i,
-  NAVIGATION: /^(?:go to|open|navigate to)\s+(.+)$/i,
-  SEARCH: /^search(?:\s+for)?\s+(.+)$/i,
-  CLICK: /^click(?:\s+(?:the|on))?\s+(.+)$/i,
-  TYPE: /^type\s+(?:in|into)?\s*(?:the\s+)?(.+?)\s*:\s*(.+)$/i
+  GREETING: new RegExp(`^(${KEYWORDS.GREETING.join('|')})$`, 'i'),
+  NAVIGATION: new RegExp(`(?:${KEYWORDS.NAVIGATION.join('|')})(?:\\s+(?:to|on|at|in))??\\s*(.+)`, 'i'),
+  SEARCH: new RegExp(`(?:${KEYWORDS.SEARCH.join('|')})(?:\\s+(?:for|about))?\\s+(.+)`, 'i'),
+  CLICK: new RegExp(`(?:${KEYWORDS.CLICK.join('|')})(?:\\s+(?:the|on|at))?\\s+(.+)`, 'i'),
+  TYPE: new RegExp(`(?:${KEYWORDS.TYPE.join('|')})(?:\\s+(?:in|into|to))?\\s*(?:the\\s+)?(.+?)\\s*:\\s*(.+)`, 'i')
 } as const;
 
 interface CommandResult {
@@ -46,7 +58,16 @@ export class CommandParser {
       // Handle navigation commands
       const navigationMatch = content.match(COMMAND_PATTERNS.NAVIGATION);
       if (navigationMatch) {
-        const url = this.normalizeUrl(navigationMatch[1]);
+        // Extract URL from the matched content
+        const urlMatch = navigationMatch[1].match(URL_PATTERN);
+        if (!urlMatch) {
+          return {
+            success: false,
+            content: "Could not detect a valid URL in the command. Please include a website address.",
+            error: "INVALID_URL"
+          };
+        }
+        const url = this.normalizeUrl(urlMatch[0]);
         return {
           success: true,
           content: `Initiating navigation to ${url}...`,

@@ -1,42 +1,42 @@
 # Active Context
 
 ## Current Work
-- Implemented robust error handling and logging system
-- Added custom error classes for better error management
-- Improved browser automation reliability
-- Enhanced command parsing and execution
-- Added comprehensive test cleanup
+- Fixed browser automation reliability issues
+- Enhanced browser instance management
+- Improved error handling and retry mechanisms
+- Updated test cleanup process
 
 ## Recent Changes
-1. Error Handling System:
-   - Created custom error classes (ChatError, ValidationError, AutomationError, StreamError)
-   - Added structured error handling throughout the application
-   - Improved error reporting with detailed messages and stack traces
+1. Browser Automation Fixes:
+   - Added proper browser instance cleanup and recreation
+   - Implemented retry mechanism for browser launch failures
+   - Enhanced error handling with detailed logging
+   - Fixed "Target page context or browser has been closed" errors
+   - Added type safety improvements throughout browser automation code
 
-2. Logging System:
-   - Implemented singleton logger with different log levels
-   - Added detailed logging throughout the application
-   - Added log filtering and retrieval capabilities
-   - Implemented log rotation to prevent memory issues
+2. Browser Instance Management:
+   - Always close existing browser instance before creating new one
+   - Added proper cleanup between commands
+   - Improved page context handling
+   - Set appropriate timeouts for operations
 
-3. Browser Automation:
-   - Improved element detection and interaction
-   - Added better selector strategies
-   - Enhanced error handling with screenshots
-   - Added detailed logging of automation actions
-   - Improved cleanup of browser instances
+3. Error Handling & Retries:
+   - Added incremental backoff for retry attempts
+   - Enhanced error logging with context
+   - Improved error screenshot capture
+   - Added better error recovery mechanisms
 
-4. Command Parser:
-   - Added Zod schema validation for messages
-   - Improved command pattern matching
-   - Enhanced selector generation for different element types
-   - Added better error handling for command parsing
+4. Test Cleanup:
+   - Updated cleanup script to remove all test artifacts
+   - Added automation error screenshots to cleanup
+   - Ensured reliable test file removal
+   - Improved cleanup logging
 
-5. Chat API:
-   - Improved message validation
-   - Enhanced stream handling and retry logic
-   - Better error handling for API responses
-   - Added detailed logging of chat operations
+5. Command Parser:
+   - Maintained existing command pattern matching
+   - Ensured proper error handling
+   - Kept robust validation system
+   - Preserved flexible selector generation
 
 ## Next Steps
 1. Consider implementing:
@@ -52,8 +52,8 @@
    - Enhance error recovery mechanisms
 
 ## Technical Notes
-- Browser automation now uses improved selector strategies
-- Error handling is now more granular and informative
-- Logging system provides better debugging capabilities
-- Command parsing is more robust and flexible
-- Test cleanup is more reliable
+- Browser automation now reliably manages instances
+- Error handling includes proper retries and recovery
+- Test cleanup removes all artifacts consistently
+- Command parsing maintains flexibility while being reliable
+- System handles browser sessions more effectively
