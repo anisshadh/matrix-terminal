@@ -1,7 +1,7 @@
 import OpenAI from "openai";
 import { Message } from "ai";
 import { ChatError, ValidationError, AutomationError, StreamError } from "@/lib/errors";
-import { CommandParser } from "@/lib/commandParser";
+import { CommandParser, CommandResult } from "@/lib/commandParser";
 import { logger } from "@/lib/logger";
 import browserAutomation from "@/lib/browserAutomation";
 import { eventStore } from "@/lib/eventStore";
@@ -70,41 +70,77 @@ export async function POST(req: Request) {
       throw new ValidationError("Last message must be from user", messageId);
     }
 
-    // Try to parse and execute command directly first
-    const commandResult = await CommandParser.parseAndExecuteCommand(latestMessage.content);
-    logger.debug('Command parsing result', { messageId, commandResult });
+    // Initialize command result variable
+    let commandResult: CommandResult | undefined;
+
+    // Parse commands and handle chaining
+    const commands = await CommandParser.parseCommands(latestMessage.content);
+    logger.debug('Parsed commands', { messageId, commandCount: commands.length });
     
-    // If it's a recognized command with no LLM needed, return the result directly
-    if (commandResult.success && !commandResult.toolCall) {
-      logger.info('Direct command execution successful', { messageId });
-      const stream = new ReadableStream({
-        start(controller) {
-          const encoder = new TextEncoder();
-
-          // Send the command response
-          const message = {
-            id: messageId,
-            role: "assistant",
-            content: commandResult.content,
-            createdAt: new Date().toISOString(),
-          };
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify(message)}\n\n`));
-          
-          // Send done marker
-          controller.enqueue(encoder.encode('data: [DONE]\n\n'));
-          controller.close();
+    // If we have parsed commands, execute them in sequence
+    if (commands.length > 0) {
+      logger.info('Executing command chain', { messageId, commandCount: commands.length });
+      
+      const results: CommandResult[] = [];
+      let success = true;
+      
+      // Execute commands sequentially
+      for (const command of commands) {
+        const result = await CommandParser.executeCommand(command);
+        results.push(result);
+        
+        // If any command fails, stop the chain
+        if (!result.success) {
+          success = false;
+          commandResult = result;
+          break;
         }
-      });
+      }
+      
+      // If all commands were successful and no LLM needed
+      if (success && !results.some(r => r.toolCall)) {
+        commandResult = {
+          success: true,
+          content: results.map(r => r.content).join('\n')
+        };
+        logger.info('Command chain execution successful', { messageId });
+        const stream = new ReadableStream({
+          start(controller) {
+            const encoder = new TextEncoder();
 
-      return new Response(stream, {
-        headers: {
-          "Content-Type": "text/event-stream",
-          "Cache-Control": "no-cache, no-transform",
-          "Connection": "keep-alive",
-          "X-Content-Type-Options": "nosniff",
-          "Access-Control-Allow-Origin": "*",
-        },
-      });
+            // Send the combined command responses
+            const message = {
+              id: messageId,
+              role: "assistant",
+              content: results.map(r => r.content).join('\n'),
+              createdAt: new Date().toISOString(),
+            };
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify(message)}\n\n`));
+            
+            // Send done marker
+            controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+            controller.close();
+          }
+        });
+
+        return new Response(stream, {
+          headers: {
+            "Content-Type": "text/event-stream",
+            "Cache-Control": "no-cache, no-transform",
+            "Connection": "keep-alive",
+            "X-Content-Type-Options": "nosniff",
+            "Access-Control-Allow-Origin": "*",
+          },
+        });
+      }
+      
+      // If any command requires browser automation, use the last result
+      if (!commandResult && results.length > 0) {
+        const lastResult = results[results.length - 1];
+        if (lastResult.toolCall) {
+          commandResult = lastResult;
+        }
+      }
     }
 
     // Filter out any messages with 'name' field as it's not supported by Groq
@@ -215,18 +251,22 @@ export async function POST(req: Request) {
 
     // Handle tool calls if present
     const toolCall = toolCheckResponse.choices[0]?.message?.tool_calls?.[0];
-    if (toolCall?.function?.name === "run_browser_automation" || commandResult.toolCall) {
+    if (toolCall?.function?.name === "run_browser_automation" || commandResult?.toolCall) {
       try {
         logger.info('Processing browser automation', { messageId, commandResult });
         
-        // Prefer command parser result over LLM tool call
-        const params = commandResult.toolCall ? {
+        // Get automation parameters from command chain or LLM tool call
+        const params = commandResult?.toolCall ? {
           ...commandResult.toolCall.arguments,
           visible: true
-        } : {
-          ...JSON.parse(toolCall?.function?.arguments || '{}'),
+        } : toolCall?.function?.name === "run_browser_automation" ? {
+          ...JSON.parse(toolCall.function.arguments || '{}'),
           visible: true
-        };
+        } : null;
+
+        if (!params) {
+          throw new AutomationError('No valid automation parameters found', messageId);
+        }
         
         // Validate URL format for navigation
         if (params.action === 'navigate' && params.url) {

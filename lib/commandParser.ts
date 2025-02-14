@@ -11,7 +11,7 @@ const MessageSchema = z.object({
 
 const MessagesSchema = z.array(MessageSchema);
 
-interface CommandResult {
+export interface CommandResult {
   success: boolean;
   content: string;
   error?: string;
@@ -26,6 +26,62 @@ export class CommandParser {
     return MessagesSchema.parse(messages);
   }
 
+  static async parseCommands(content: string): Promise<any[]> {
+    try {
+      // Use SmartCommandParser to parse the command
+      const actions = await SmartCommandParser.parseCommand(content);
+      return actions;
+    } catch (error) {
+      logger.error('Command parsing error:', error instanceof Error ? error : new Error('Unknown error'));
+      return [];
+    }
+  }
+
+  static async executeCommand(command: any): Promise<CommandResult> {
+    try {
+      // Special case for greetings
+      if (typeof command === 'string' && /^(hi|hello|hey|greetings)$/i.test(command)) {
+        return {
+          success: true,
+          content: "Greetings, user. Matrix connection established. Awaiting further instructions."
+        };
+      }
+
+      // Handle browser automation command
+      const actionMessage = this.getActionMessage(command);
+      
+      return {
+        success: true,
+        content: actionMessage,
+        toolCall: {
+          name: "run_browser_automation",
+          arguments: command
+        }
+      };
+    } catch (error) {
+      logger.error('Command execution error:', error instanceof Error ? error : new Error('Unknown error'));
+      return {
+        success: false,
+        content: "An error occurred while executing your command. Please try again.",
+        error: error instanceof Error ? error.message : "UNKNOWN_ERROR"
+      };
+    }
+  }
+
+  private static getActionMessage(command: any): string {
+    switch (command.action) {
+      case 'navigate':
+        return `Initiating navigation to ${command.url}...`;
+      case 'click':
+        return `Executing click on specified element...`;
+      case 'type':
+        return `Typing "${command.value}" into specified element...`;
+      default:
+        return 'Executing command...';
+    }
+  }
+
+  // Keep this for backward compatibility
   static async parseAndExecuteCommand(content: string): Promise<CommandResult> {
     try {
       // Special case for greetings

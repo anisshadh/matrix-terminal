@@ -47,7 +47,8 @@ export class BrowserAutomation {
   private keepOpen: boolean = false;
   private currentSessionId: string | null = null;
   private static activeSessions = new Map<string, BrowserState>();
-  private static readonly INACTIVITY_TIMEOUT = 30000; // 30 seconds
+  private static readonly INACTIVITY_TIMEOUT = 300000; // 5 minutes
+  private static readonly VIDEO_RECORDING_ENABLED = false; // Disable video recording by default
 
   // Initialize cleanup daemon
   private static cleanupDaemon = setInterval(() => {
@@ -168,13 +169,19 @@ export class BrowserAutomation {
         throw new Error('Failed to initialize browser');
       }
       
-      const context = await this.browser.newContext({
-        recordVideo: { dir: 'videos/' }, // Enable video recording for debugging
+      const contextOptions: any = {
         viewport: { width: 1920, height: 1080 }, // Full HD resolution
         deviceScaleFactor: 1,
         isMobile: false,
         hasTouch: false
-      });
+      };
+
+      // Only enable video recording if explicitly enabled
+      if (BrowserAutomation.VIDEO_RECORDING_ENABLED) {
+        contextOptions.recordVideo = { dir: 'videos/' };
+      }
+
+      const context = await this.browser.newContext(contextOptions);
       
       // Create main page with focus handling
       this.page = await context.newPage();
@@ -276,13 +283,25 @@ export class BrowserAutomation {
         type: 'CLEANUP',
         data: { keepOpen: this.keepOpen }
       });
+
+      // Get the session state
+      const sessionState = BrowserAutomation.activeSessions.get(sessionId);
+      
       // Only cleanup if keepOpen is false
-      if (this.browser && !this.keepOpen) {
-        logger.debug('Cleaning up browser instance');
-        await this.browser.close();
+      if (!this.keepOpen) {
+        if (sessionState) {
+          logger.debug('Cleaning up browser instance');
+          await sessionState.instance.close();
+          BrowserAutomation.activeSessions.delete(sessionId);
+        }
         this.browser = null;
         this.page = null;
       } else {
+        // Update session timestamp to prevent timeout
+        if (sessionState) {
+          sessionState.timestamp = Date.now();
+          BrowserAutomation.activeSessions.set(sessionId, sessionState);
+        }
         logger.debug('Skipping cleanup due to keepOpen flag');
       }
     } catch (error) {

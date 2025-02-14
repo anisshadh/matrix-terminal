@@ -58,86 +58,97 @@ export class SmartCommandParser {
         return clickKeywords.some(keyword => text.includes(keyword));
       };
 
-      // Process navigation intents
-      if (urls?.length) {
-        actions.push({
-          action: 'navigate',
-          url: urls[0].startsWith('http') ? urls[0] : `https://${urls[0]}`,
-          visible: true
-        });
-      } else {
-        // Check for website shortcuts
-        for (const [site, url] of Object.entries(websiteShortcuts)) {
-          if (normalizedInput.includes(site)) {
-            actions.push({
-              action: 'navigate',
-              url,
-              visible: true
-            });
-            break;
-          }
-        }
-      }
-
-      // Process search intents
-      if (impliesSearch(normalizedInput)) {
-        // Extract search query - look for content after search keywords
-        const searchKeywords = ['search for', 'search', 'find', 'look up', 'lookup'];
-        let searchQuery = '';
+      // Split input into separate commands
+      const commandSeparators = /(?:then|and|,|;)/i;
+      const commands = normalizedInput.split(commandSeparators).map(cmd => cmd.trim()).filter(Boolean);
+      
+      // Process each command separately
+      for (const command of commands) {
+        const commandActions: AutomationAction[] = [];
         
-        for (const keyword of searchKeywords) {
-          const index = normalizedInput.indexOf(keyword);
-          if (index !== -1) {
-            searchQuery = normalizedInput.slice(index + keyword.length).trim();
-            // Remove any trailing commands
-            searchQuery = searchQuery.split(/(?:then|and|,|\.|$)/)[0].trim();
-            break;
-          }
-        }
-
-        if (searchQuery) {
-          // If we haven't navigated anywhere, assume Google search
-          if (actions.length === 0) {
-            actions.push({
-              action: 'navigate',
-              url: 'https://www.google.com',
-              visible: true
-            });
-          }
-
-          actions.push({
-            action: 'type',
-            selector: 'input[type="search"], input[name="q"], input[aria-label*="search" i]',
-            value: searchQuery,
+        // Extract URLs from this command
+        const commandUrls = command.match(urlPattern);
+        
+        // Process navigation intents
+        if (commandUrls?.length) {
+          commandActions.push({
+            action: 'navigate',
+            url: commandUrls[0].startsWith('http') ? commandUrls[0] : `https://${commandUrls[0]}`,
             visible: true
           });
-        }
-      }
-
-      // Process click intents
-      if (impliesClick(normalizedInput)) {
-        // Extract what to click - look for content after click keywords
-        const clickKeywords = ['click', 'press', 'select', 'choose', 'open'];
-        let elementToClick = '';
-        
-        for (const keyword of clickKeywords) {
-          const index = normalizedInput.indexOf(keyword);
-          if (index !== -1) {
-            elementToClick = normalizedInput.slice(index + keyword.length).trim();
-            // Remove any trailing commands
-            elementToClick = elementToClick.split(/(?:then|and|,|\.|$)/)[0].trim();
-            break;
+        } else {
+          // Check for website shortcuts
+          for (const [site, url] of Object.entries(websiteShortcuts)) {
+            if (command.includes(site)) {
+              commandActions.push({
+                action: 'navigate',
+                url,
+                visible: true
+              });
+              break;
+            }
           }
         }
 
-        if (elementToClick) {
-          actions.push({
-            action: 'click',
-            selector: this.generateSmartSelector(elementToClick),
-            visible: true
-          });
+        // Process search intents for this command
+        if (impliesSearch(command)) {
+          // Extract search query for this specific command
+          const searchKeywords = ['search for', 'search', 'find', 'look up', 'lookup'];
+          let searchQuery = '';
+          
+          for (const keyword of searchKeywords) {
+            const index = command.indexOf(keyword);
+            if (index !== -1) {
+              searchQuery = command.slice(index + keyword.length).trim();
+              break;
+            }
+          }
+
+          if (searchQuery) {
+            // If we haven't navigated anywhere in this command, assume Google search
+            if (commandActions.length === 0) {
+              commandActions.push({
+                action: 'navigate',
+                url: 'https://www.google.com',
+                visible: true
+              });
+            }
+
+            commandActions.push({
+              action: 'type',
+              selector: 'input[type="search"], input[name="q"], input[aria-label*="search" i]',
+              value: searchQuery,
+              visible: true
+            });
+          }
         }
+
+        // Process click intents for this command
+        if (impliesClick(command)) {
+          const clickKeywords = ['click', 'press', 'select', 'choose', 'open'];
+          let elementToClick = '';
+          
+          for (const keyword of clickKeywords) {
+            const index = command.indexOf(keyword);
+            if (index !== -1) {
+              elementToClick = command.slice(index + keyword.length).trim();
+              break;
+            }
+          }
+
+          if (elementToClick) {
+            commandActions.push({
+              action: 'click',
+              selector: this.generateSmartSelector(elementToClick),
+              visible: true
+            });
+          }
+        }
+
+        // Add all actions from this command to the main actions array
+        actions.push(...commandActions);
       }
+
 
       // Validate all actions
       const validatedActions = actions.map(action => {

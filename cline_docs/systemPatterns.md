@@ -76,18 +76,51 @@ The BrowserAutomation class implements a sophisticated singleton pattern with qu
    - Detailed visual debugging
 
 ### Command Processing
-- Parses and validates automation commands
-- Supports multi-action command chains
-- Integrates with AI for command interpretation
-- Maintains consistent command execution patterns
-- Manages action queues effectively
+The system uses a three-layer command processing architecture:
+
+1. SmartCommandParser
+   - Natural language command parsing
+   - Command chain separation using delimiters (then, and, comma, semicolon)
+   - Context isolation per command
+   - Intelligent URL and action detection
+   - Website shortcut resolution
+
+2. CommandParser
+   - Command validation and type safety
+   - Command execution orchestration
+   - Chain execution management
+   - Error handling and recovery
+   - Result aggregation
+
+3. BrowserAutomation
+   - Session-based browser management
+   - Command execution with state preservation
+   - Resource cleanup and optimization
+   - Error handling with visual verification
+   - Performance optimization
 
 ### Action Chaining
-- Executes multiple actions in sequence
-- Maintains browser state between actions
-- Intelligent cleanup handling
-- Supports visible/headless mode transitions
-- Provides comprehensive chain status reporting
+The system implements a sophisticated action chaining mechanism:
+
+1. Chain Parsing
+   - Natural language chain detection
+   - Command separation and normalization
+   - Context preservation between commands
+   - Chain validation and optimization
+
+2. Chain Execution
+   - Sequential command processing
+   - State preservation between actions
+   - Browser instance reuse within chains
+   - Visibility state management
+   - Error handling with chain awareness
+
+3. Chain State Management
+   - Session-based state tracking
+   - Browser instance caching
+   - Resource optimization
+   - Cleanup strategy determination
+   - Chain result aggregation
 
 ### Logging System
 - Hierarchical logging with debug, info, and error levels
@@ -105,11 +138,29 @@ The BrowserAutomation class implements a sophisticated singleton pattern with qu
 - Retry mechanisms with configurable attempts
 - Shadow validation for additional verification
 
-### Browser Persistence
-- Browser window remains open when visible=true
-- State is maintained across automation requests
-- Cleanup only occurs when persistence isn't required
-- Intelligent state management for action chains
+### Browser Instance Management
+The system implements a sophisticated session-based browser management system:
+
+1. Session Management
+   - Unique session IDs for request tracking
+   - 5-minute session timeout
+   - Automatic cleanup of inactive sessions
+   - Resource optimization
+   - State preservation between requests
+
+2. Browser Instance Caching
+   - Session-based instance storage
+   - Instance reuse within sessions
+   - State verification before reuse
+   - Automatic cleanup of stale instances
+   - Memory optimization
+
+3. Resource Management
+   - Disabled video recording by default
+   - Optimized memory usage
+   - Efficient cleanup strategies
+   - Performance monitoring
+   - Resource usage tracking
 
 ### Error Recovery
 - Automatic recovery from page crashes
@@ -146,16 +197,30 @@ The BrowserAutomation class implements a sophisticated singleton pattern with qu
 15. Clean up stale resources automatically
 
 ## Future Considerations
-- Implement visual diffing for state changes
-- Add parallel action execution with state isolation
-- Expand visual debugging capabilities
-- Enhance temporal consistency checks
-- Add support for complex interaction patterns
-- Implement visual timeline for debugging
-- Add sophisticated retry mechanisms with visual verification
-- Enhance focus management for complex scenarios
-- Implement advanced state rollback with visual validation
-- Add parallel chunk processing capabilities
-- Implement stream analytics dashboard
-- Enhance validation strategies
-- Add real-time stream monitoring
+1. Browser Management
+   - Implement browser instance pooling
+   - Add load balancing for high-traffic scenarios
+   - Enhance session management with clustering
+   - Implement advanced caching strategies
+   - Add sophisticated resource monitoring
+
+2. Command Processing
+   - Add support for more complex command patterns
+   - Implement parallel command execution
+   - Enhance natural language parsing
+   - Add command optimization strategies
+   - Implement command analytics
+
+3. Performance Optimization
+   - Implement browser instance pooling
+   - Add load balancing for high-traffic scenarios
+   - Enhance session management with clustering
+   - Optimize resource usage patterns
+   - Implement advanced caching strategies
+
+4. Monitoring and Analytics
+   - Implement browser automation dashboard
+   - Add detailed performance metrics
+   - Enhance debugging capabilities
+   - Add real-time monitoring
+   - Implement usage analytics
