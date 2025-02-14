@@ -40,17 +40,24 @@
    - Text-based selectors
 
 ## Command Processing
-1. Command Parsing
-   - Regex-based pattern matching
-   - Command validation
-   - Parameter extraction
-   - Error handling for invalid commands
+1. Smart Command Parsing
+   - AI-driven natural language understanding
+   - Dynamic action inference
+   - Chained command support
+   - Flexible pattern recognition
+   - Fallback mechanisms for ambiguous inputs
 
 2. Command Execution
-   - Direct command handling
-   - LLM-assisted command processing
+   - Sequential action processing
+   - Automated context handling
    - Tool call integration
-   - Result validation
+   - Result validation and error recovery
+
+3. Command Structure
+   - Action-based architecture
+   - Standardized automation interfaces
+   - Extensible command patterns
+   - Robust validation schemas
 
 ## API Communication
 1. Stream Handling

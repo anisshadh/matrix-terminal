@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import browserAutomation from './browserAutomation';
 import { logger } from './logger';
+import { SmartCommandParser } from './smartCommandParser';
 
 // Define schemas for validation
 const MessageSchema = z.object({
@@ -9,27 +10,6 @@ const MessageSchema = z.object({
 });
 
 const MessagesSchema = z.array(MessageSchema);
-
-// Keywords for command detection
-const KEYWORDS = {
-  GREETING: ['hi', 'hello', 'hey', 'greetings'],
-  NAVIGATION: ['go', 'open', 'navigate', 'visit', 'browse', 'load', 'show'],
-  SEARCH: ['search', 'find', 'lookup', 'look up'],
-  CLICK: ['click', 'press', 'select', 'choose'],
-  TYPE: ['type', 'enter', 'input', 'write']
-} as const;
-
-// URL pattern for detecting web addresses
-const URL_PATTERN = /(?:https?:\/\/)?(?:www\.)?[a-zA-Z0-9-]+(?:\.[a-zA-Z]{2,})+(?:\/[^\s]*)?/i;
-
-// Command patterns for parsing
-const COMMAND_PATTERNS = {
-  GREETING: new RegExp(`^(${KEYWORDS.GREETING.join('|')})$`, 'i'),
-  NAVIGATION: new RegExp(`(?:${KEYWORDS.NAVIGATION.join('|')})(?:\\s+(?:to|on|at|in))??\\s*(.+)`, 'i'),
-  SEARCH: new RegExp(`(?:${KEYWORDS.SEARCH.join('|')})(?:\\s+(?:for|about))?\\s+(.+)`, 'i'),
-  CLICK: new RegExp(`(?:${KEYWORDS.CLICK.join('|')})(?:\\s+(?:the|on|at))?\\s+(.+)`, 'i'),
-  TYPE: new RegExp(`(?:${KEYWORDS.TYPE.join('|')})(?:\\s+(?:in|into|to))?\\s*(?:the\\s+)?(.+?)\\s*:\\s*(.+)`, 'i')
-} as const;
 
 interface CommandResult {
   success: boolean;
@@ -48,154 +28,64 @@ export class CommandParser {
 
   static async parseAndExecuteCommand(content: string): Promise<CommandResult> {
     try {
-      // Handle greetings
-      if (COMMAND_PATTERNS.GREETING.test(content)) {
+      // Special case for greetings
+      if (/^(hi|hello|hey|greetings)$/i.test(content)) {
         return {
           success: true,
           content: "Greetings, user. Matrix connection established. Awaiting further instructions."
         };
       }
 
-      // Handle navigation commands
-      const navigationMatch = content.match(COMMAND_PATTERNS.NAVIGATION);
-      if (navigationMatch) {
-        // Extract and clean the URL from the matched content
-        let targetUrl = navigationMatch[1]
-          // Remove leading prepositions and whitespace
-          .replace(/^(?:to|on|at|in)[\s'"]+/i, '')
-          // Remove any remaining quotes and whitespace
-          .replace(/['"]/g, '')
-          .trim();
+      // Use SmartCommandParser to parse the command
+      const actions = await SmartCommandParser.parseCommand(content);
 
-        // Log the initial cleaned URL
-        logger.debug('Initial cleaned URL:', targetUrl);
-        
-        // Handle common website names without full URL
-        if (!URL_PATTERN.test(targetUrl)) {
-          // Add .com if no TLD is present
-          if (!targetUrl.includes('.')) {
-            targetUrl += '.com';
-            logger.debug('Added .com to URL:', targetUrl);
-          }
-        }
-        
-        const url = this.normalizeUrl(targetUrl);
+      // If no actions were parsed
+      if (actions.length === 0) {
         return {
-          success: true,
-          content: `Initiating navigation to ${url}...`,
-          toolCall: {
-            name: "run_browser_automation",
-            arguments: {
-              action: "navigate",
-              url,
-              visible: true
-            }
-          }
+          success: false,
+          content: "Command not recognized. Please try rephrasing your request.",
+          error: "UNRECOGNIZED_COMMAND"
         };
       }
 
-      // Handle search commands
-      const searchMatch = content.match(COMMAND_PATTERNS.SEARCH);
-      if (searchMatch) {
-        const searchQuery = searchMatch[1];
-        return {
-          success: true,
-          content: `Executing search for "${searchQuery}"...`,
-          toolCall: {
-            name: "run_browser_automation",
-            arguments: {
-              action: "type",
-              selector: '#search, input[type="search"], input[name="search_query"]',
-              value: searchQuery,
-              visible: true
-            }
-          }
-        };
+      // For now, we'll execute the first action and queue the rest
+      // In a future update, we can implement proper action chaining
+      const firstAction = actions[0];
+      
+      // Generate appropriate response message
+      let responseMessage = '';
+      switch (firstAction.action) {
+        case 'navigate':
+          responseMessage = `Initiating navigation to ${firstAction.url}...`;
+          break;
+        case 'click':
+          responseMessage = `Executing click on specified element...`;
+          break;
+        case 'type':
+          responseMessage = `Typing "${firstAction.value}" into specified element...`;
+          break;
       }
 
-      // Handle click commands
-      const clickMatch = content.match(COMMAND_PATTERNS.CLICK);
-      if (clickMatch) {
-        const element = clickMatch[1];
-        const selector = this.getElementSelector(element);
-        return {
-          success: true,
-          content: `Executing click on ${element}...`,
-          toolCall: {
-            name: "run_browser_automation",
-            arguments: {
-              action: "click",
-              selector,
-              visible: true
-            }
-          }
-        };
+      // If there are additional actions, add a note
+      if (actions.length > 1) {
+        responseMessage += ` (${actions.length - 1} additional actions queued)`;
       }
 
-      // Handle type commands
-      const typeMatch = content.match(COMMAND_PATTERNS.TYPE);
-      if (typeMatch) {
-        const [, element, text] = typeMatch;
-        const selector = this.getElementSelector(element);
-        return {
-          success: true,
-          content: `Typing "${text}" into ${element}...`,
-          toolCall: {
-            name: "run_browser_automation",
-            arguments: {
-              action: "type",
-              selector,
-              value: text,
-              visible: true
-            }
-          }
-        };
-      }
-
-      // If no command pattern matches
       return {
-        success: false,
-        content: "Command not recognized. Please try rephrasing your request.",
-        error: "UNRECOGNIZED_COMMAND"
+        success: true,
+        content: responseMessage,
+        toolCall: {
+          name: "run_browser_automation",
+          arguments: firstAction
+        }
       };
     } catch (error) {
-      console.error('Command parsing error:', error);
+      logger.error('Command parsing error:', error instanceof Error ? error : new Error('Unknown error'));
       return {
         success: false,
         content: "An error occurred while processing your command. Please try again.",
         error: error instanceof Error ? error.message : "UNKNOWN_ERROR"
       };
     }
-  }
-
-  private static normalizeUrl(url: string): string {
-    if (!url.startsWith('http://') && !url.startsWith('https://')) {
-      return `https://${url}`;
-    }
-    return url;
-  }
-
-  private static getElementSelector(element: string): string {
-    // Map common element descriptions to selectors
-    const selectorMap: Record<string, string> = {
-      'search button': 'button[aria-label*="search" i], button[type="submit"]',
-      'search box': 'input[type="search"], input[name="q"]',
-      'submit button': 'button[type="submit"], input[type="submit"]'
-    };
-
-    // Try to find a predefined selector
-    const selector = selectorMap[element.toLowerCase()];
-    if (selector) {
-      return selector;
-    }
-
-    // Generate a flexible selector based on the element description
-    return [
-      `[aria-label*="${element}" i]`,
-      `[placeholder*="${element}" i]`,
-      `button:has-text("${element}")`,
-      `a:has-text("${element}")`,
-      `input[name*="${element}" i]`
-    ].join(', ');
   }
 }
