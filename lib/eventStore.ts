@@ -5,7 +5,7 @@ import crypto from 'crypto';
 export interface AutomationEvent {
   id: string;
   timestamp: number;
-  type: 'INIT' | 'NAVIGATE' | 'CLICK' | 'TYPE' | 'SUCCESS' | 'ERROR' | 'CLEANUP' | 'VISUAL_VERIFICATION';
+  type: 'INIT' | 'NAVIGATE' | 'CLICK' | 'TYPE' | 'SUCCESS' | 'ERROR' | 'CLEANUP' | 'VISUAL_VERIFICATION' | 'VISUAL_STATE_VERIFIED';
   data?: any;
   error?: string;
 }

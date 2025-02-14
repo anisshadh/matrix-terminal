@@ -4,7 +4,7 @@ import { logger } from '@/lib/logger';
 interface AutomationEvent {
   id: string;
   timestamp: number;
-  type: 'INIT' | 'NAVIGATE' | 'CLICK' | 'TYPE' | 'SUCCESS' | 'ERROR' | 'CLEANUP';
+  type: 'INIT' | 'NAVIGATE' | 'CLICK' | 'TYPE' | 'SUCCESS' | 'ERROR' | 'CLEANUP' | 'VISUAL_STATE_VERIFIED';
   data?: any;
   error?: string;
 }
@@ -68,6 +68,8 @@ export function AutomationStatus({ sessionId, className = '' }: AutomationStatus
         return '❌';
       case 'CLEANUP':
         return '🧹';
+      case 'VISUAL_STATE_VERIFIED':
+        return '👁️';
       default:
         return '📝';
     }
@@ -95,6 +97,8 @@ export function AutomationStatus({ sessionId, className = '' }: AutomationStatus
         return `Error: ${event.error}`;
       case 'CLEANUP':
         return 'Cleaning up...';
+      case 'VISUAL_STATE_VERIFIED':
+        return `Page loaded successfully: ${event.data?.title || event.data?.url}`;
       default:
         return 'Unknown event';
     }

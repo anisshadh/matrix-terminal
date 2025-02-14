@@ -22,25 +22,14 @@ const AutomationActionSchema = z.object({
 });
 
 // Action-specific keyword sets
-const navigationKeywords = {
-  primary: ['go to', 'navigate to', 'open', 'visit'],
-  secondary: ['browse', 'load', 'access']
-};
+const COMMAND_TRIGGERS = {
+  navigation: ['go to', 'navigate to', 'open', 'visit'],
+  click: ['click on', 'click the', 'press on', 'select the'],
+  search: ['search for', 'look up', 'find'],
+  type: ['type', 'enter', 'input']
+} as const;
 
-const clickKeywords = {
-  primary: ['click on', 'click the', 'press on', 'select the'],
-  secondary: ['choose the', 'pick the']
-};
-
-const searchKeywords = {
-  primary: ['search for', 'look up', 'find'],
-  secondary: ['search', 'lookup', 'find']
-};
-
-const typeKeywords = {
-  primary: ['type', 'enter', 'input'],
-  secondary: ['write', 'fill']
-};
+// Secondary keywords are removed to prevent false positives
 
 // Negative keywords that should never trigger browser actions
 const negativeKeywords = [
@@ -66,13 +55,11 @@ const negativeKeywords = [
   'thank you'
 ];
 
-// Common website shortcuts with their full URLs
+// Website shortcuts require exact word matches
 const websiteShortcuts: Record<string, string> = {
   'google': 'https://www.google.com',
   'youtube': 'https://www.youtube.com',
   'github': 'https://www.github.com',
-  'twitter': 'https://www.twitter.com',
-  'x': 'https://www.twitter.com',
   'facebook': 'https://www.facebook.com',
   'amazon': 'https://www.amazon.com',
   'wikipedia': 'https://www.wikipedia.org',
@@ -82,11 +69,28 @@ const websiteShortcuts: Record<string, string> = {
 
 export class SmartCommandParser {
   /**
+   * Checks if input contains an explicit command trigger
+   */
+  private static hasExplicitCommand(input: string): boolean {
+    return Object.values(COMMAND_TRIGGERS)
+      .flat()
+      .some(trigger => input.toLowerCase().includes(trigger));
+  }
+
+  /**
+   * Checks if a website reference is an exact word match
+   */
+  private static isExactSiteMatch(input: string, site: string): boolean {
+    const words = input.toLowerCase().split(/\s+/);
+    return words.includes(site.toLowerCase());
+  }
+
+  /**
    * Calculate confidence score for a potential browser action
    */
   private static calculateConfidence(
     input: string,
-    matchedKeywords: string[],
+    commandType: keyof typeof COMMAND_TRIGGERS,
     hasContext: boolean,
     isNegative: boolean
   ): number {
@@ -94,32 +98,22 @@ export class SmartCommandParser {
 
     let score = 0;
 
-    // Base score from keyword matches
-    const primaryMatches = matchedKeywords.filter(kw => 
-      Object.values(navigationKeywords.primary).includes(kw) ||
-      Object.values(clickKeywords.primary).includes(kw) ||
-      Object.values(searchKeywords.primary).includes(kw) ||
-      Object.values(typeKeywords.primary).includes(kw)
+    // Check if input contains any of the command triggers
+    const matchCount = COMMAND_TRIGGERS[commandType].filter(trigger => 
+      input.toLowerCase().includes(trigger)
     ).length;
 
-    const secondaryMatches = matchedKeywords.filter(kw =>
-      Object.values(navigationKeywords.secondary).includes(kw) ||
-      Object.values(clickKeywords.secondary).includes(kw) ||
-      Object.values(searchKeywords.secondary).includes(kw) ||
-      Object.values(typeKeywords.secondary).includes(kw)
-    ).length;
+    // Base score from command matches
+    score += matchCount * 0.4;
 
-    score += primaryMatches * 0.4;    // Primary keywords are worth more
-    score += secondaryMatches * 0.2;   // Secondary keywords are worth less
-
-    // Boost score if there's context (like a URL or specific element description)
+    // Boost score if there's context
     if (hasContext) {
       score += 0.3;
     }
 
-    // Penalize very short inputs as they're more likely to be ambiguous
-    if (input.split(' ').length < 3) {
-      score *= 0.5;
+    // Boost score for explicit commands
+    if (this.hasExplicitCommand(input)) {
+      score += 0.3;
     }
 
     // Cap the score at 1.0
@@ -177,66 +171,52 @@ export class SmartCommandParser {
         let hasContext = false;
 
         // Process navigation intents
-        if (commandUrls?.length) {
-          hasContext = true;
-          const navigationAction: AutomationAction = {
-            action: 'navigate',
-            url: commandUrls[0].startsWith('http') ? commandUrls[0] : `https://${commandUrls[0]}`,
-            visible: true
-          };
-          
-          // Calculate confidence for navigation
-          navigationAction.confidence = this.calculateConfidence(
-            command,
-            [...navigationKeywords.primary, ...navigationKeywords.secondary],
-            true,
-            false
-          );
-          
-          if (navigationAction.confidence >= 0.6) {
-            commandActions.push(navigationAction);
+        if (commandUrls?.length || this.hasExplicitCommand(command)) {
+          const url = commandUrls?.[0] || '';
+          if (url || this.hasExplicitCommand(command)) {
+            hasContext = true;
+            const navigationAction: AutomationAction = {
+              action: 'navigate',
+              url: url.startsWith('http') ? url : `https://${url}`,
+              visible: true
+            };
+            
+            navigationAction.confidence = this.calculateConfidence(
+              command,
+              'navigation',
+              true,
+              false
+            );
+            
+            if (navigationAction.confidence >= 0.6) {
+              commandActions.push(navigationAction);
+            }
           }
-        } else {
-          // Check for website shortcuts
+        }
+
+        // Check for website shortcuts only with explicit navigation commands
+        if (this.hasExplicitCommand(command)) {
           for (const [site, url] of Object.entries(websiteShortcuts)) {
-            if (command.includes(site)) {
+            if (this.isExactSiteMatch(command, site)) {
               hasContext = true;
               const navigationAction: AutomationAction = {
                 action: 'navigate',
                 url,
-                visible: true
+                visible: true,
+                confidence: 1.0 // Exact match = high confidence
               };
-              
-              navigationAction.confidence = this.calculateConfidence(
-                command,
-                [...navigationKeywords.primary, ...navigationKeywords.secondary],
-                true,
-                false
-              );
-              
-              if (navigationAction.confidence >= 0.6) {
-                commandActions.push(navigationAction);
-                break;
-              }
+              commandActions.push(navigationAction);
+              break;
             }
           }
         }
 
         // Process search intents
-        const searchMatches = searchKeywords.primary.concat(searchKeywords.secondary)
-          .filter(keyword => command.includes(keyword));
+        const searchTriggers = COMMAND_TRIGGERS.search;
+        const searchMatch = searchTriggers.find(trigger => command.includes(trigger));
         
-        if (searchMatches.length > 0) {
-          matchedKeywords.push(...searchMatches);
-          let searchQuery = '';
-          
-          // Extract search query using the longest matching keyword
-          const matchedKeyword = searchMatches
-            .sort((a, b) => b.length - a.length)[0];
-          const index = command.indexOf(matchedKeyword);
-          if (index !== -1) {
-            searchQuery = command.slice(index + matchedKeyword.length).trim();
-          }
+        if (searchMatch) {
+          const searchQuery = command.slice(command.indexOf(searchMatch) + searchMatch.length).trim();
 
           if (searchQuery) {
             hasContext = true;
@@ -260,7 +240,7 @@ export class SmartCommandParser {
             
             searchAction.confidence = this.calculateConfidence(
               command,
-              matchedKeywords,
+              'search',
               hasContext,
               false
             );
@@ -272,20 +252,11 @@ export class SmartCommandParser {
         }
 
         // Process click intents
-        const clickMatches = clickKeywords.primary.concat(clickKeywords.secondary)
-          .filter(keyword => command.includes(keyword));
+        const clickTriggers = COMMAND_TRIGGERS.click;
+        const clickMatch = clickTriggers.find(trigger => command.includes(trigger));
         
-        if (clickMatches.length > 0) {
-          matchedKeywords.push(...clickMatches);
-          let elementToClick = '';
-          
-          // Extract element description using the longest matching keyword
-          const matchedKeyword = clickMatches
-            .sort((a, b) => b.length - a.length)[0];
-          const index = command.indexOf(matchedKeyword);
-          if (index !== -1) {
-            elementToClick = command.slice(index + matchedKeyword.length).trim();
-          }
+        if (clickMatch) {
+          const elementToClick = command.slice(command.indexOf(clickMatch) + clickMatch.length).trim();
 
           if (elementToClick) {
             hasContext = true;
@@ -297,7 +268,7 @@ export class SmartCommandParser {
             
             clickAction.confidence = this.calculateConfidence(
               command,
-              matchedKeywords,
+              'click',
               hasContext,
               false
             );
