@@ -1,7 +1,12 @@
 import OpenAI from "openai";
 import { Message } from "ai";
-import { ChatCompletionMessageParam } from "openai/resources/chat/completions";
+import { ChatError, ValidationError, AutomationError, StreamError } from "@/lib/errors";
+import { CommandParser } from "@/lib/commandParser";
+import { logger } from "@/lib/logger";
 import browserAutomation from "@/lib/browserAutomation";
+
+type ChatRole = 'user' | 'assistant' | 'system';
+type ChatMessage = { role: ChatRole; content: string };
 
 export const runtime = "nodejs";
 
@@ -22,38 +27,101 @@ export async function OPTIONS() {
 }
 
 export async function POST(req: Request) {
+  const messageId = crypto.randomUUID();
+  logger.info('Received chat request', { messageId });
+
   if (!process.env.GROQ_API_KEY) {
+    const error = new ChatError('GROQ_API_KEY not configured', messageId);
+    logger.error(error.message, error);
     return new Response(
-      JSON.stringify({ error: "GROQ_API_KEY is not configured" }),
+      JSON.stringify({ error: error.message }),
       { status: 500, headers: { "Content-Type": "application/json" } }
     );
   }
 
   try {
     const { messages } = await req.json() as { messages: Message[] };
+    logger.debug('Received messages', { messageId, messageCount: messages.length });
+
+    // Validate messages using Zod schema
+    try {
+      CommandParser.validateMessages(messages);
+    } catch (error) {
+      const validationError = new ValidationError(
+        'Invalid message format',
+        messageId,
+        error instanceof Error ? error.message : 'Unknown validation error'
+      );
+      logger.error('Message validation failed', validationError);
+      return new Response(
+        JSON.stringify({ 
+          error: validationError.message,
+          details: validationError.details
+        }),
+        { status: 400, headers: { "Content-Type": "application/json" } }
+      );
+    }
+
+    // Get the latest user message
+    const latestMessage = messages[messages.length - 1];
+    if (latestMessage.role !== 'user') {
+      throw new ValidationError("Last message must be from user", messageId);
+    }
+
+    // Try to parse and execute command directly first
+    const commandResult = await CommandParser.parseAndExecuteCommand(latestMessage.content);
+    logger.debug('Command parsing result', { messageId, commandResult });
+    
+    // If it's a recognized command with no LLM needed, return the result directly
+    if (commandResult.success && !commandResult.toolCall) {
+      logger.info('Direct command execution successful', { messageId });
+      const stream = new ReadableStream({
+        start(controller) {
+          const encoder = new TextEncoder();
+
+          // Send the command response
+          const message = {
+            id: messageId,
+            role: "assistant",
+            content: commandResult.content,
+            createdAt: new Date().toISOString(),
+          };
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify(message)}\n\n`));
+          
+          // Send done marker
+          controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+          controller.close();
+        }
+      });
+
+      return new Response(stream, {
+        headers: {
+          "Content-Type": "text/event-stream",
+          "Cache-Control": "no-cache, no-transform",
+          "Connection": "keep-alive",
+          "X-Content-Type-Options": "nosniff",
+          "Access-Control-Allow-Origin": "*",
+        },
+      });
+    }
 
     // Filter out any messages with 'name' field as it's not supported by Groq
-    const apiMessages: ChatCompletionMessageParam[] = [
+    const apiMessages: ChatMessage[] = [
       {
         role: "system",
         content:
-          "Act as a Matrix terminal AI. You are directly connected to the digital realm, the Matrix. Your mission is to guide user 'G' through this simulated reality, providing precise, real-time data.Maintain a direct, concise, and slightly robotic tone with a technical edge. Use simple, clear language, understandable to a 10-year-old. Provide factual, data-driven information relevant to the Matrix simulation, treating it as real. Keep responses brief and to the point, avoiding unnecessary detail."
+          "Act as a Matrix terminal AI. You are directly connected to the digital realm, the Matrix. Your mission is to guide user 'G' through this simulated reality, providing precise, real-time data. Maintain a direct, concise, and slightly robotic tone with a technical edge. Use simple, clear language, understandable to a 10-year-old. Provide factual, data-driven information relevant to the Matrix simulation, treating it as real. Keep responses brief and to the point, avoiding unnecessary detail."
       },
       ...messages.map(m => {
-        // Only include supported fields
         const { role, content } = m;
         return {
           role: (role === "user" || role === "assistant" || role === "system") ? role : "user",
           content: content || ""
-        };
-      }).filter(m => m.content) // Filter out empty messages
+        } as ChatMessage;
+      }).filter(m => m.content)
     ];
 
-    if (apiMessages.length < 2) { // System message + at least one user message
-      throw new Error("At least one user message is required");
-    }
-
-    console.log('Starting chat completion with messages:', JSON.stringify(apiMessages, null, 2));
+    logger.debug('Starting chat completion', { messageId, messageCount: apiMessages.length });
 
     let response = await client.chat.completions.create({
       model: "llama-3.3-70b-versatile",
@@ -147,18 +215,32 @@ export async function POST(req: Request) {
     const toolCall = toolCheckResponse.choices[0]?.message?.tool_calls?.[0];
     if (toolCall?.function?.name === "run_browser_automation") {
       try {
+        logger.info('Processing browser automation tool call', { messageId, toolCall });
+        
         const params = {
-        ...JSON.parse(toolCall.function.arguments),
-        visible: true // Always use visible mode for better user experience
-      };
-        const result = await browserAutomation.execute(params);
+          ...JSON.parse(toolCall.function.arguments),
+          visible: true // Always use visible mode for better user experience
+        };
+
+        // Parse the command using our CommandParser
+        const commandResult = await CommandParser.parseAndExecuteCommand(latestMessage.content);
+        if (commandResult.toolCall) {
+          // Use the parsed command's parameters instead of raw LLM output
+          params.selector = commandResult.toolCall.arguments.selector || params.selector;
+          params.url = commandResult.toolCall.arguments.url || params.url;
+          params.value = commandResult.toolCall.arguments.value || params.value;
+        }
+        
+        // Execute browser automation
+        const automationResult = await browserAutomation.execute(params);
+        logger.info('Browser automation result', { messageId, success: automationResult.success });
         
         // Add the tool result to the messages
         apiMessages.push({
           role: "assistant",
-          content: result.success 
-            ? `Browser automation successful: ${result.message}`
-            : `Browser automation failed: ${result.error}`
+          content: automationResult.success 
+            ? automationResult.message
+            : `Browser automation failed: ${automationResult.error}`
         });
         
         // Get a follow-up streaming response
@@ -170,41 +252,37 @@ export async function POST(req: Request) {
           n: 1
         });
       } catch (error) {
-        console.error("Error executing browser automation:", error);
-        throw error;
+        const automationError = new AutomationError(
+          'Browser automation failed',
+          messageId,
+          error instanceof Error ? error.message : 'Unknown error'
+        );
+        logger.error('Error executing browser automation:', automationError);
+        throw automationError;
       }
     }
 
-    console.log('Got streaming response from Groq');
+    logger.info('Creating response stream', { messageId });
 
     // Create a stream with proper SSE formatting and retry logic
     const stream = new ReadableStream({
       async start(controller) {
         const encoder = new TextEncoder();
-        const messageId = crypto.randomUUID();
         let fullContent = "";
         let retryCount = 0;
         const maxRetries = 3;
         const retryDelay = 1000; // 1 second
 
-        console.log('Starting stream with messageId:', messageId);
-
         const processStream = async () => {
           try {
             for await (const chunk of response) {
-              console.log('Raw chunk:', chunk);
+              logger.debug('Processing chunk', { messageId, chunk });
 
               try {
                 // Only process valid chunks with content
                 const content = chunk.choices?.[0]?.delta?.content;
                 if (content) {
                   fullContent += content;
-                  
-                  console.log('Processing chunk:', {
-                    content,
-                    fullContent,
-                    messageId
-                  });
                   
                   // Send the current state
                   const message = {
@@ -215,18 +293,23 @@ export async function POST(req: Request) {
                   };
 
                   controller.enqueue(encoder.encode(`data: ${JSON.stringify(message)}\n\n`));
-                  console.log('Sent message update');
+                  logger.debug('Sent message update', { messageId, contentLength: fullContent.length });
                 }
               } catch (error) {
-                console.error('Error processing chunk:', error);
-                throw new Error('Failed to process response chunk');
+                const streamError = new StreamError(
+                  'Failed to process response chunk',
+                  messageId,
+                  error instanceof Error ? error.message : 'Unknown error'
+                );
+                logger.error('Error processing chunk:', streamError);
+                throw streamError;
               }
             }
             
             try {
               // Ensure final message is sent
               if (fullContent) {
-                console.log('Stream complete, sending final message');
+                logger.info('Stream complete, sending final message', { messageId });
                 
                 const finalMessage = {
                   id: messageId,
@@ -237,9 +320,9 @@ export async function POST(req: Request) {
                 };
                 
                 controller.enqueue(encoder.encode(`data: ${JSON.stringify(finalMessage)}\n\n`));
-                console.log('Final message sent');
               } else {
                 // If no content was received, send error message
+                logger.warn('No content received in stream', { messageId });
                 const errorMessage = {
                   id: messageId,
                   role: "assistant",
@@ -252,20 +335,23 @@ export async function POST(req: Request) {
               }
               
               // Always send DONE marker
-              console.log('Sending DONE marker');
               controller.enqueue(encoder.encode('data: [DONE]\n\n'));
             } catch (error) {
-              console.error('Error sending final messages:', error);
-              throw error;
+              const streamError = new StreamError(
+                'Error sending final messages',
+                messageId,
+                error instanceof Error ? error.message : 'Unknown error'
+              );
+              logger.error('Error sending final messages:', streamError);
+              throw streamError;
             }
             controller.close();
           } catch (error) {
-            console.error("Stream error:", error);
             const isTimeoutError = error instanceof Error && error.message === "Stream timeout";
             
             if (retryCount < maxRetries && !isTimeoutError) {
               retryCount++;
-              console.log(`Retrying stream (attempt ${retryCount}/${maxRetries})...`);
+              logger.info(`Retrying stream (attempt ${retryCount}/${maxRetries})...`, { messageId });
               await new Promise(resolve => setTimeout(resolve, retryDelay));
               return processStream();
             }
@@ -299,16 +385,25 @@ export async function POST(req: Request) {
       },
     });
   } catch (error) {
-    console.error("API error:", error);
+    logger.error("API error:", error instanceof ChatError ? error : new ChatError('Unknown error', messageId));
     
     let statusCode = 500;
     let errorMessage = "Internal Server Error";
+    let errorDetails = error instanceof Error ? error.message : undefined;
     
-    if (error instanceof Error) {
-      if (error.message === "At least one user message is required") {
-        statusCode = 400;
-        errorMessage = error.message;
-      } else if (error.message.includes("temperature")) {
+    if (error instanceof ValidationError) {
+      statusCode = 400;
+      errorMessage = error.message;
+    } else if (error instanceof AutomationError) {
+      statusCode = 500;
+      errorMessage = "Browser automation failed";
+      errorDetails = error.details;
+    } else if (error instanceof StreamError) {
+      statusCode = 500;
+      errorMessage = "Stream processing failed";
+      errorDetails = error.details;
+    } else if (error instanceof Error) {
+      if (error.message.includes("temperature")) {
         statusCode = 400;
         errorMessage = "Temperature must be a float32 > 0 and <= 2";
       } else if (error.message.includes("model")) {
@@ -323,7 +418,7 @@ export async function POST(req: Request) {
     return new Response(
       JSON.stringify({ 
         error: errorMessage,
-        details: error instanceof Error ? error.message : undefined
+        details: errorDetails
       }),
       { 
         status: statusCode, 

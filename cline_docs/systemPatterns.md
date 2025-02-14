@@ -1,120 +1,139 @@
 # System Patterns
 
-## Architecture Overview
-The system follows a layered architecture with clear component separation:
+## Error Handling
+1. Custom Error Classes
+   - Base `ChatError` class with messageId and details
+   - Specialized error types (ValidationError, AutomationError, StreamError)
+   - Consistent error structure across the application
+   - Proper error inheritance and type checking
 
-1. User Interface Layer
-   - Next.js frontend with TypeScript
-   - Matrix-themed visual components
-   - Real-time message display
-   - Animation system
+2. Error Recovery
+   - Retry mechanisms for transient failures
+   - Graceful degradation when features are unavailable
+   - Detailed error logging for debugging
+   - User-friendly error messages
 
-2. AI Processing Layer
-   - Message interpretation
-   - Command detection
-   - Context management
-   - Response generation
+## Logging
+1. Centralized Logger
+   - Singleton pattern for consistent logging
+   - Multiple log levels (debug, info, warn, error)
+   - Structured log format with timestamps
+   - Log rotation to prevent memory issues
 
-3. Browser Control Layer
-   - Playwright integration for browser automation
-   - Visible browser feedback
-   - Action execution and persistence
+2. Log Categories
+   - Browser automation logs
+   - Chat/LLM interaction logs
+   - Error logs with stack traces
+   - Performance metrics
+
+## Browser Automation
+1. Element Interaction
+   - Wait for element visibility
+   - Scroll elements into view
+   - Verify element properties
+   - Handle dynamic content loading
+
+2. Selector Strategy
+   - Multiple selector fallbacks
+   - Role-based selectors
+   - Attribute-based selectors
+   - Text-based selectors
+
+## Command Processing
+1. Command Parsing
+   - Regex-based pattern matching
+   - Command validation
+   - Parameter extraction
+   - Error handling for invalid commands
+
+2. Command Execution
+   - Direct command handling
+   - LLM-assisted command processing
+   - Tool call integration
+   - Result validation
+
+## API Communication
+1. Stream Handling
+   - Chunked response processing
+   - Retry logic for failed streams
    - Error recovery
+   - Progress tracking
 
-## Communication Patterns
-1. Message Flow
-   ```
-   User → Interface → AI → Browser Automation → Result Handler → Interface → User
-   ```
+2. Message Processing
+   - Message validation
+   - Content filtering
+   - Response formatting
+   - Error handling
 
-2. Error Handling Flow
-   ```
-   Error Source → Error Handler → State Update → UI Update → User Feedback
-                      ↓
-                 Retry Logic
-                      ↓
-              Recovery Process
-   ```
-
-3. Message Streaming Flow
-   ```
-   Server → Stream → Buffer → Parser → State → UI Update
-                      ↓          ↓
-                   Cleanup    Error
-                              ↓
-                         Recovery
-   ```
-
-4. Browser Automation Flow
-   ```
-   AI Command → Tool Use → Browser Launch → Action Execution → Visual Feedback
-                  ↓             ↓                ↓                ↓
-            Param Validation  Visible Mode    State Update    User Confirmation
-   ```
-
-## Technical Decisions
-1. Framework Selection
-   - Next.js for robust full-stack capabilities
-   - TypeScript for type safety
-   - Tailwind CSS for styling
-   - shadcn/ui for component foundation
-
-2. Integration Patterns
-   - API Routes for backend communication
-   - Groq API tool use for browser automation
-   - Playwright for browser control
-   - Simple AI components for AI integration
-
-3. State Management
-   - React hooks for local state
-   - API-based data fetching
-   - Real-time updates
-
-4. Browser Automation
-   - Singleton pattern for browser instance
-   - Visible mode for user feedback
-   - Persistent browser sessions
-   - Action-based interface (navigate, click, type)
-
-## Development Patterns
-1. Component Structure
-   - Atomic design principles
-   - Reusable UI components
-   - Separation of concerns
-
-2. Testing Strategy
-   - Unit tests for components
-   - Integration tests for flows
-   - E2E tests for critical paths
+## Testing
+1. End-to-End Tests
    - Browser automation testing
+   - Chat interface testing
+   - Error scenario testing
+   - Performance testing
 
-3. Error Handling
-   - Comprehensive error detection
-   - Visual error indicators
-   - Graceful degradation
-   - Retry mechanisms with backoff
-   - User feedback loops
-   - Type-safe error handling
-   - State recovery patterns
-   - Browser session recovery
+2. Test Cleanup
+   - Automatic resource cleanup
+   - Screenshot capture on failure
+   - Log collection
+   - State reset between tests
 
-## Performance Patterns
-1. Animation Optimization
-   - CSS transitions
-   - RequestAnimationFrame
+## Code Organization
+1. Module Structure
+   - Feature-based organization
+   - Clear separation of concerns
+   - Dependency injection
+   - Interface-based design
+
+2. File Structure
+   ```
+   /lib
+     /browserAutomation.ts  - Browser control
+     /commandParser.ts      - Command processing
+     /errors.ts            - Error definitions
+     /logger.ts           - Logging system
+   /app
+     /api
+       /chat
+         /route.ts        - Chat API endpoint
+   /tests
+     /e2e                - End-to-end tests
+   ```
+
+## Best Practices
+1. Error Handling
+   - Always use custom error classes
+   - Include context in error messages
+   - Log errors with stack traces
+   - Provide user-friendly messages
+
+2. Logging
+   - Log at appropriate levels
+   - Include relevant context
+   - Use structured logging
+   - Rotate logs regularly
+
+3. Browser Automation
+   - Wait for elements properly
+   - Handle dynamic content
+   - Clean up resources
+   - Take screenshots on failure
+
+4. Testing
+   - Test error scenarios
+   - Clean up after tests
+   - Use meaningful assertions
+   - Document test cases
+
+## Future Considerations
+1. Scalability
+   - Log persistence
+   - Metrics collection
+   - Performance optimization
+   - Caching strategies
+
+2. Maintainability
+   - Documentation updates
+   - Code reviews
+   - Regular testing
    - Performance monitoring
-
-2. Load Management
-   - Lazy loading
-   - Code splitting
-   - Resource optimization
-   - Stream buffering
-   - State reconciliation
-   - Memory management
-   - Browser resource cleanup
-
-3. Browser Automation Optimization
-   - Session persistence
-   - Resource cleanup on completion
-   - Error state recovery
-   - Memory management for long-running sessions
