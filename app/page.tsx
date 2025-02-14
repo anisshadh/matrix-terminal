@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Wifi } from "lucide-react"
 import type React from "react"
+import { AutomationStatus } from "@/components/ui/automation-status"
 
 const MatrixCode = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -87,6 +88,7 @@ export default function MatrixControlCenter() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [automationSessionId, setAutomationSessionId] = useState<string | null>(null);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setInput(e.target.value);
@@ -99,6 +101,7 @@ export default function MatrixControlCenter() {
     try {
       setIsLoading(true);
       setIsTyping(true);
+      setAutomationSessionId(null);
       
       // Add user message
       const userMessage = { id: crypto.randomUUID(), role: "user", content: input };
@@ -115,6 +118,12 @@ export default function MatrixControlCenter() {
 
       if (!response.ok) {
         throw new Error(response.statusText);
+      }
+
+      // Get automation session ID from response headers
+      const sessionId = response.headers.get('X-Automation-Session');
+      if (sessionId) {
+        setAutomationSessionId(sessionId);
       }
 
       // Handle streaming response
@@ -278,7 +287,7 @@ export default function MatrixControlCenter() {
         <header className="border-b border-[#00FF00] border-opacity-50 p-4 flex justify-between items-center">
           <div className="flex items-center gap-2">
             <span className="text-[#00FF00] animate-blink text-2xl">{">"}</span>
-            <h1 className="text-2xl uppercase tracking-wider font-bold">Matrix  Terminal</h1>
+            <h1 className="text-2xl uppercase tracking-wider font-bold">Matrix Terminal</h1>
           </div>
           <div className="flex items-center gap-2">
             <Wifi className="w-5 h-5 animate-pulse" />
@@ -314,6 +323,10 @@ export default function MatrixControlCenter() {
                 </span>
               </div>
             )}
+            <AutomationStatus 
+              sessionId={automationSessionId} 
+              className="mt-4 mb-2"
+            />
             <div ref={messagesEndRef} style={{ height: "0px" }} />
           </div>
 

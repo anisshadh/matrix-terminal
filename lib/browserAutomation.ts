@@ -1,5 +1,6 @@
 import { chromium, Browser, Page } from 'playwright';
 import { logger } from './logger';
+import { eventStore } from './eventStore';
 
 interface BrowserAutomationParams {
   action: 'navigate' | 'click' | 'type';
@@ -30,9 +31,15 @@ export class BrowserAutomation {
   private browser: Browser | null = null;
   private page: Page | null = null;
   private keepOpen: boolean = false;
+  private currentSessionId: string | null = null;
 
-  private async initBrowser(retryCount = 0, maxRetries = 3): Promise<void> {
+  private async initBrowser(sessionId: string, retryCount = 0, maxRetries = 3): Promise<void> {
     try {
+      this.currentSessionId = sessionId;
+      eventStore.addEvent(sessionId, {
+        type: 'INIT',
+        data: { retryCount, keepOpen: this.keepOpen }
+      });
       logger.debug('Initializing browser automation', { retryCount, keepOpen: this.keepOpen });
 
       // Check if we can reuse existing browser and page
@@ -50,7 +57,7 @@ export class BrowserAutomation {
               viewport: { width: 1280, height: 720 }
             });
             this.page = await context.newPage();
-            this.setupPageListeners();
+            this.setupPageListeners(sessionId);
             return;
           }
         } catch (error) {
@@ -79,7 +86,7 @@ export class BrowserAutomation {
         if (retryCount < maxRetries) {
           logger.warn(`Browser launch failed, retrying (${retryCount + 1}/${maxRetries})...`, error);
           await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)));
-          return this.initBrowser(retryCount + 1, maxRetries);
+          return this.initBrowser(sessionId, retryCount + 1, maxRetries);
         }
         throw error;
       }
@@ -94,7 +101,7 @@ export class BrowserAutomation {
       this.page = await context.newPage();
       logger.debug('Created new browser page');
 
-      this.setupPageListeners();
+      this.setupPageListeners(sessionId);
     } catch (error) {
       const errorMessage = `Failed to initialize browser: ${error instanceof Error ? error.message : 'Unknown error'}`;
       logger.error(errorMessage, error instanceof Error ? error : undefined);
@@ -102,7 +109,7 @@ export class BrowserAutomation {
     }
   }
 
-  private setupPageListeners(): void {
+  private setupPageListeners(sessionId: string): void {
     if (!this.page) return;
 
     // Set default timeout
@@ -113,16 +120,28 @@ export class BrowserAutomation {
       const type = msg.type();
       const text = msg.text();
       logger.debug(`Browser console [${type}]:`, text);
+      eventStore.addEvent(sessionId, {
+        type: 'SUCCESS',
+        data: { console: { type, text } }
+      });
     });
 
     // Listen for errors
     this.page.on('pageerror', error => {
       logger.error('Browser page error:', error);
+      eventStore.addEvent(sessionId, {
+        type: 'ERROR',
+        error: error.toString()
+      });
     });
   }
 
-  private async cleanup(): Promise<void> {
+  private async cleanup(sessionId: string): Promise<void> {
     try {
+      eventStore.addEvent(sessionId, {
+        type: 'CLEANUP',
+        data: { keepOpen: this.keepOpen }
+      });
       // Only cleanup if keepOpen is false
       if (this.browser && !this.keepOpen) {
         logger.debug('Cleaning up browser instance');
@@ -137,31 +156,98 @@ export class BrowserAutomation {
     }
   }
 
-  public async execute(params: BrowserAutomationParams): Promise<AutomationResult> {
+  public async execute(sessionId: string, params: BrowserAutomationParams | { actions: BrowserAutomationParams[] }): Promise<AutomationResult> {
     logger.info('Executing browser automation', params);
+    eventStore.createSession(sessionId);
     
     try {
-      // Validate required parameters
-      this.validateParams(params);
+      // Handle array of actions
+      if ('actions' in params) {
+        const results: AutomationResult[] = [];
+        
+        for (let i = 0; i < params.actions.length; i++) {
+          const action = params.actions[i];
+          // Keep browser open between actions in the chain
+          this.keepOpen = i < params.actions.length - 1 || action.visible === true;
+          
+          // Initialize browser only for first action or if it was closed
+          if (i === 0 || !this.browser || !this.page) {
+            await this.initBrowser(sessionId);
+          }
+          
+          if (!this.page) {
+            throw new Error('Failed to initialize browser page');
+          }
+          
+          // Execute single action
+          const result = await this.executeSingleAction(sessionId, action);
+          results.push(result);
+          
+          // If any action fails, stop the chain
+          if (!result.success) {
+            return result;
+          }
+        }
+        
+        // Return success if all actions completed
+        return {
+          success: true,
+          message: results.map(r => r.message).join(' | ')
+        };
+      }
       
-      // Set keepOpen based on the visible parameter
+      // Handle single action (backward compatibility)
       this.keepOpen = params.visible === true;
-      
-      await this.initBrowser();
+      await this.initBrowser(sessionId);
       
       if (!this.page) {
         throw new Error('Failed to initialize browser page');
       }
+      
+      return await this.executeSingleAction(sessionId, params);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      eventStore.addEvent(sessionId, {
+        type: 'ERROR',
+        error: errorMessage
+      });
+      logger.error('Browser automation error:', error instanceof Error ? error : new Error(errorMessage));
+      
+      return {
+        success: false,
+        message: 'Browser automation failed',
+        error: errorMessage
+      };
+    } finally {
+      await this.cleanup(sessionId);
+    }
+  }
+
+  private async executeSingleAction(sessionId: string, params: BrowserAutomationParams): Promise<AutomationResult> {
+    try {
+      // Validate required parameters
+      this.validateParams(params);
 
       switch (params.action) {
         case 'navigate':
           if (!params.url) {
             throw new Error('URL is required for navigate action');
           }
+          eventStore.addEvent(sessionId, {
+            type: 'NAVIGATE',
+            data: { url: params.url }
+          });
           logger.debug(`Navigating to URL: ${params.url}`);
+          if (!this.page) {
+            throw new Error('Browser page not initialized');
+          }
           await this.page.goto(params.url, { 
             waitUntil: 'networkidle',
             timeout: 30000 
+          });
+          eventStore.addEvent(sessionId, {
+            type: 'SUCCESS',
+            data: { action: 'navigate', url: params.url }
           });
           logger.info(`Successfully navigated to ${params.url}`);
           return {
@@ -173,6 +259,10 @@ export class BrowserAutomation {
           if (!params.selector) {
             throw new Error('Selector is required for click action');
           }
+          eventStore.addEvent(sessionId, {
+            type: 'CLICK',
+            data: { selector: params.selector }
+          });
           logger.debug(`Attempting to click element: ${params.selector}`);
           
           // Try each selector until we find a visible element
@@ -204,6 +294,10 @@ export class BrowserAutomation {
           await clickElement.scrollIntoViewIfNeeded();
           await clickElement.click();
           
+          eventStore.addEvent(sessionId, {
+            type: 'SUCCESS',
+            data: { action: 'click', selector: params.selector }
+          });
           logger.info(`Successfully clicked element: ${params.selector}`);
           return {
             success: true,
@@ -214,6 +308,10 @@ export class BrowserAutomation {
           if (!params.selector || !params.value) {
             throw new Error('Selector and value are required for type action');
           }
+          eventStore.addEvent(sessionId, {
+            type: 'TYPE',
+            data: { selector: params.selector, value: params.value }
+          });
           logger.debug(`Attempting to type into element: ${params.selector}`);
           
           // Find and interact with input element
@@ -230,13 +328,20 @@ export class BrowserAutomation {
           // Optional: Press Enter if it's a search input
           if (params.selector.includes('search') || params.value.toLowerCase().includes('search')) {
             logger.debug('Search input detected, pressing Enter');
-            await this.page.keyboard.press('Enter');
-            // Wait for navigation if needed
-            await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {
+          if (!this.page) {
+            throw new Error('Browser page not initialized');
+          }
+          await this.page.keyboard.press('Enter');
+          // Wait for navigation if needed
+          await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {
               logger.debug('No navigation occurred after pressing Enter');
             });
           }
           
+          eventStore.addEvent(sessionId, {
+            type: 'SUCCESS',
+            data: { action: 'type', selector: params.selector }
+          });
           logger.info(`Successfully typed text into element: ${params.selector}`);
           return {
             success: true,
@@ -248,8 +353,11 @@ export class BrowserAutomation {
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      eventStore.addEvent(sessionId, {
+        type: 'ERROR',
+        error: errorMessage
+      });
       logger.error('Browser automation error:', error instanceof Error ? error : new Error(errorMessage));
-      
       
       return {
         success: false,
@@ -257,7 +365,7 @@ export class BrowserAutomation {
         error: errorMessage
       };
     } finally {
-      await this.cleanup();
+      await this.cleanup(sessionId);
     }
   }
 

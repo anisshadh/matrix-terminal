@@ -48,35 +48,41 @@ export class CommandParser {
         };
       }
 
-      // For now, we'll execute the first action and queue the rest
-      // In a future update, we can implement proper action chaining
-      const firstAction = actions[0];
-      
-      // Generate appropriate response message
-      let responseMessage = '';
-      switch (firstAction.action) {
-        case 'navigate':
-          responseMessage = `Initiating navigation to ${firstAction.url}...`;
-          break;
-        case 'click':
-          responseMessage = `Executing click on specified element...`;
-          break;
-        case 'type':
-          responseMessage = `Typing "${firstAction.value}" into specified element...`;
-          break;
-      }
+      // Execute all actions in sequence
+      const responseMessages: string[] = [];
+      const chainedActions = actions.map(action => {
+        let actionMessage = '';
+        switch (action.action) {
+          case 'navigate':
+            actionMessage = `Initiating navigation to ${action.url}...`;
+            break;
+          case 'click':
+            actionMessage = `Executing click on specified element...`;
+            break;
+          case 'type':
+            actionMessage = `Typing "${action.value}" into specified element...`;
+            break;
+        }
+        responseMessages.push(actionMessage);
+        return action;
+      });
 
-      // If there are additional actions, add a note
-      if (actions.length > 1) {
-        responseMessage += ` (${actions.length - 1} additional actions queued)`;
-      }
+      // Set visible=true for all actions in the chain except the last one
+      // This keeps the browser open between actions
+      chainedActions.forEach((action, index) => {
+        if (index < chainedActions.length - 1) {
+          action.visible = true;
+        }
+      });
 
       return {
         success: true,
-        content: responseMessage,
+        content: responseMessages.join(' Then '),
         toolCall: {
           name: "run_browser_automation",
-          arguments: firstAction
+          arguments: {
+            actions: chainedActions
+          }
         }
       };
     } catch (error) {

@@ -28,6 +28,7 @@ export async function OPTIONS() {
 
 export async function POST(req: Request) {
   const messageId = crypto.randomUUID();
+  const sessionId = crypto.randomUUID();
   logger.info('Received chat request', { messageId });
 
   if (!process.env.GROQ_API_KEY) {
@@ -234,7 +235,7 @@ export async function POST(req: Request) {
         logger.info('Executing browser automation with params:', { messageId, params });
         
         // Execute browser automation
-        const automationResult = await browserAutomation.execute(params);
+        const automationResult = await browserAutomation.execute(sessionId, params);
         logger.info('Browser automation result', { messageId, automationResult });
         
         // Add the result to messages
@@ -384,6 +385,7 @@ export async function POST(req: Request) {
         "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Methods": "POST, OPTIONS",
         "Access-Control-Allow-Headers": "Content-Type",
+        "X-Automation-Session": sessionId,
       },
     });
   } catch (error) {
