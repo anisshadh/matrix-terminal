@@ -139,20 +139,14 @@ export class BrowserAutomation {
           }
           logger.debug(`Attempting to click element: ${params.selector}`);
           
-          // Wait for element to be visible and clickable
-          await this.page.waitForSelector(params.selector, { 
-            state: 'visible',
-            timeout: 10000 
-          });
-          
-          // Ensure element is in view
-          const element = await this.page.$(params.selector);
-          if (!element) {
+          // Try each selector until we find a visible element
+          const clickElement = await this.findElement(params.selector);
+          if (!clickElement) {
             throw new Error(`Element not found: ${params.selector}`);
           }
           
           // Log element properties for debugging
-          const elementProperties = await element.evaluate((el: HTMLElement): ElementProperties => {
+          const elementProperties = await clickElement.evaluate((el: HTMLElement): ElementProperties => {
             const rect = el.getBoundingClientRect();
             return {
               isVisible: window.getComputedStyle(el).display !== 'none' && 
@@ -171,8 +165,8 @@ export class BrowserAutomation {
           });
           logger.debug('Element properties:', elementProperties);
           
-          await element.scrollIntoViewIfNeeded();
-          await element.click();
+          await clickElement.scrollIntoViewIfNeeded();
+          await clickElement.click();
           
           logger.info(`Successfully clicked element: ${params.selector}`);
           return {
@@ -186,15 +180,16 @@ export class BrowserAutomation {
           }
           logger.debug(`Attempting to type into element: ${params.selector}`);
           
-          // Wait for element to be visible and enabled
-          await this.page.waitForSelector(params.selector, { 
-            state: 'visible',
-            timeout: 10000 
-          });
-          
+          // Find and interact with input element
+          const inputElement = await this.findElement(params.selector);
+          if (!inputElement) {
+            throw new Error('No matching element found for any selector');
+          }
+
           // Clear existing text and type new value
-          await this.page.fill(params.selector, '');
-          await this.page.fill(params.selector, params.value);
+          await inputElement.click();
+          await inputElement.fill('');
+          await inputElement.fill(params.value);
           
           // Optional: Press Enter if it's a search input
           if (params.selector.includes('search') || params.value.toLowerCase().includes('search')) {
@@ -275,6 +270,33 @@ export class BrowserAutomation {
         }
         break;
     }
+  }
+
+  private async findElement(selector: string) {
+    if (!this.page) {
+      throw new Error('Browser page not initialized');
+    }
+
+    // Split multiple selectors and try each one
+    const selectors = selector.split(',').map(s => s.trim());
+    
+    for (const singleSelector of selectors) {
+      try {
+        const element = await this.page.waitForSelector(singleSelector, {
+          state: 'visible',
+          timeout: 5000
+        });
+        if (element) {
+          logger.debug(`Found element with selector: ${singleSelector}`);
+          return element;
+        }
+      } catch (error) {
+        logger.debug(`Selector not found: ${singleSelector}`);
+        continue;
+      }
+    }
+    
+    return null;
   }
 }
 

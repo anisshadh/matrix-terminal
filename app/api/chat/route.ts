@@ -213,33 +213,35 @@ export async function POST(req: Request) {
 
     // Handle tool calls if present
     const toolCall = toolCheckResponse.choices[0]?.message?.tool_calls?.[0];
-    if (toolCall?.function?.name === "run_browser_automation") {
+    if (toolCall?.function?.name === "run_browser_automation" || commandResult.toolCall) {
       try {
-        logger.info('Processing browser automation tool call', { messageId, toolCall });
+        logger.info('Processing browser automation', { messageId, commandResult });
         
-        const params = {
-          ...JSON.parse(toolCall.function.arguments),
-          visible: true // Always use visible mode for better user experience
+        // Prefer command parser result over LLM tool call
+        const params = commandResult.toolCall ? {
+          ...commandResult.toolCall.arguments,
+          visible: true
+        } : {
+          ...JSON.parse(toolCall?.function?.arguments || '{}'),
+          visible: true
         };
-
-        // Parse the command using our CommandParser
-        const commandResult = await CommandParser.parseAndExecuteCommand(latestMessage.content);
-        if (commandResult.toolCall) {
-          // Use the parsed command's parameters instead of raw LLM output
-          params.selector = commandResult.toolCall.arguments.selector || params.selector;
-          params.url = commandResult.toolCall.arguments.url || params.url;
-          params.value = commandResult.toolCall.arguments.value || params.value;
+        
+        // Validate URL format for navigation
+        if (params.action === 'navigate' && params.url) {
+          params.url = params.url.startsWith('http') ? params.url : `https://${params.url}`;
         }
+
+        logger.info('Executing browser automation with params:', { messageId, params });
         
         // Execute browser automation
         const automationResult = await browserAutomation.execute(params);
-        logger.info('Browser automation result', { messageId, success: automationResult.success });
+        logger.info('Browser automation result', { messageId, automationResult });
         
-        // Add the tool result to the messages
+        // Add the result to messages
         apiMessages.push({
           role: "assistant",
           content: automationResult.success 
-            ? automationResult.message
+            ? `Successfully completed browser action: ${automationResult.message}`
             : `Browser automation failed: ${automationResult.error}`
         });
         

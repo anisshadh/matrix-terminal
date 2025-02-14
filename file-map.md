@@ -13,11 +13,24 @@
 │   │   │       │   ├── 3.pack.gz
 │   │   │       │   ├── 4.pack.gz
 │   │   │       │   ├── 5.pack.gz
+│   │   │       │   ├── 6.pack.gz
+│   │   │       │   ├── 7.pack.gz
+│   │   │       │   ├── 8.pack.gz
+│   │   │       │   ├── 9.pack.gz
+│   │   │       │   ├── 10.pack.gz
+│   │   │       │   ├── index.pack.gz
+│   │   │       │   └── index.pack.gz.old
+│   │   │       ├── client-development-fallback
+│   │   │       │   ├── 0.pack.gz
+│   │   │       │   ├── 1.pack.gz
+│   │   │       │   ├── 2.pack.gz
 │   │   │       │   ├── index.pack.gz
 │   │   │       │   └── index.pack.gz.old
 │   │   │       ├── edge-server-development
 │   │   │       │   ├── 0.pack.gz
 │   │   │       │   ├── 1.pack.gz
+│   │   │       │   ├── 2.pack.gz
+│   │   │       │   ├── 3.pack.gz
 │   │   │       │   ├── index.pack.gz
 │   │   │       │   └── index.pack.gz.old
 │   │   │       └── server-development
@@ -25,44 +38,38 @@
 │   │   │           ├── 1.pack.gz
 │   │   │           ├── 2.pack.gz
 │   │   │           ├── 3.pack.gz
+│   │   │           ├── 4.pack.gz
+│   │   │           ├── 5.pack.gz
+│   │   │           ├── 6.pack.gz
+│   │   │           ├── 7.pack.gz
+│   │   │           ├── 8.pack.gz
+│   │   │           ├── 9.pack.gz
 │   │   │           ├── index.pack.gz
 │   │   │           └── index.pack.gz.old
 │   │   ├── server
 │   │   │   ├── app
-│   │   │   │   ├── api
-│   │   │   │   │   └── chat
-│   │   │   │   │       └── route.js
-│   │   │   │   ├── favicon.ico
-│   │   │   │   │   └── route.js
-│   │   │   │   ├── page_client-reference-manifest.js
-│   │   │   │   └── page.js
-│   │   │   ├── static
-│   │   │   │   └── webpack
-│   │   │   │       ├── 988ec3c62b63dda9.edge-runtime-webpack.hot-update.json
-│   │   │   │       ├── 633457081244afec._.hot-update.json
-│   │   │   │       └── b7b41276360564d4._.hot-update.json
+│   │   │   │   └── api
+│   │   │   │       └── chat
+│   │   │   │           └── route.js
 │   │   │   ├── vendor-chunks
-│   │   │   │   ├── @ai-sdk.js
 │   │   │   │   ├── @opentelemetry.js
-│   │   │   │   ├── @radix-ui.js
-│   │   │   │   ├── @swc.js
-│   │   │   │   ├── ai.js
-│   │   │   │   ├── class-variance-authority.js
-│   │   │   │   ├── clsx.js
-│   │   │   │   ├── dequal.js
-│   │   │   │   ├── eventsource-parser.js
-│   │   │   │   ├── lucide-react.js
-│   │   │   │   ├── nanoid.js
+│   │   │   │   ├── abort-controller.js
+│   │   │   │   ├── agentkeepalive.js
+│   │   │   │   ├── event-target-shim.js
+│   │   │   │   ├── form-data-encoder.js
+│   │   │   │   ├── formdata-node.js
+│   │   │   │   ├── humanize-ms.js
+│   │   │   │   ├── ms.js
 │   │   │   │   ├── next.js
-│   │   │   │   ├── secure-json-parse.js
-│   │   │   │   ├── swr.js
-│   │   │   │   ├── tailwind-merge.js
-│   │   │   │   ├── throttleit.js
-│   │   │   │   ├── use-sync-external-store.js
-│   │   │   │   ├── zod-to-json-schema.js
+│   │   │   │   ├── node-domexception.js
+│   │   │   │   ├── node-fetch.js
+│   │   │   │   ├── openai.js
+│   │   │   │   ├── tr46.js
+│   │   │   │   ├── web-streams-polyfill.js
+│   │   │   │   ├── webidl-conversions.js
+│   │   │   │   ├── whatwg-url.js
 │   │   │   │   └── zod.js
 │   │   │   ├── app-paths-manifest.json
-│   │   │   ├── edge-runtime-webpack.js
 │   │   │   ├── interception-route-rewrite-manifest.js
 │   │   │   ├── middleware-build-manifest.js
 │   │   │   ├── middleware-manifest.json
@@ -75,43 +82,15 @@
 │   │   │   └── webpack-runtime.js
 │   │   ├── static
 │   │   │   ├── chunks
-│   │   │   │   ├── app
-│   │   │   │   │   ├── layout.js
-│   │   │   │   │   └── page.js
-│   │   │   │   ├── app-pages-internals.js
-│   │   │   │   ├── main-app.js
-│   │   │   │   ├── polyfills.js
-│   │   │   │   └── webpack.js
-│   │   │   ├── css
-│   │   │   │   └── app
-│   │   │   │       └── layout.css
-│   │   │   ├── development
-│   │   │   │   ├── _buildManifest.js
-│   │   │   │   └── _ssgManifest.js
-│   │   │   ├── media
-│   │   │   │   ├── 6d93bde91c0c2823-s.woff2
-│   │   │   │   ├── 26a46d62cd723877-s.woff2
-│   │   │   │   ├── 55c55f0601d81cf3-s.woff2
-│   │   │   │   ├── 97e0cb1ae144a2a9-s.woff2
-│   │   │   │   ├── 581909926a08bbc8-s.woff2
-│   │   │   │   ├── a34f9d1faa5f3315-s.p.woff2
-│   │   │   │   └── df0a9ae256c0569c-s.woff2
-│   │   │   └── webpack
-│   │   │       ├── app
-│   │   │       │   ├── layout.37b94f9f3dfe8ba7.hot-update.js
-│   │   │       │   └── layout.e69ced8766ec3313.hot-update.js
-│   │   │       ├── 37b94f9f3dfe8ba7.webpack.hot-update.json
-│   │   │       ├── 633457081244afec._.hot-update.json
-│   │   │       ├── e69ced8766ec3313.webpack.hot-update.json
-│   │   │       ├── webpack.37b94f9f3dfe8ba7.hot-update.js
-│   │   │       └── webpack.e69ced8766ec3313.hot-update.js
+│   │   │   │   └── polyfills.js
+│   │   │   └── development
+│   │   │       ├── _buildManifest.js
+│   │   │       └── _ssgManifest.js
 │   │   ├── types
 │   │   │   ├── app
-│   │   │   │   ├── api
-│   │   │   │   │   └── chat
-│   │   │   │   │       └── route.ts
-│   │   │   │   ├── layout.ts
-│   │   │   │   └── page.ts
+│   │   │   │   └── api
+│   │   │   │       └── chat
+│   │   │   │           └── route.ts
 │   │   │   └── package.json
 │   │   ├── app-build-manifest.json
 │   │   ├── build-manifest.json
@@ -146,15 +125,26 @@
 │   │   ├── progress.md
 │   │   └── system_architecture.md
 │   ├── lib
+│   │   ├── browserAutomation.ts
+│   │   ├── commandParser.ts
+│   │   ├── errors.ts
+│   │   ├── logger.ts
 │   │   └── utils.ts
+│   ├── scripts
+│   │   └── cleanup-tests.ts
+│   ├── tests
+│   │   └── e2e
+│   │       └── advanced-automation.test.ts
 │   ├── .clineignore
 │   ├── .clinerules
 │   ├── .env.local
 │   ├── .eslintrc.json
 │   ├── components.json
+│   ├── file-map.md
 │   ├── next-env.d.ts
 │   ├── next.config.mjs
 │   ├── package.json
+│   ├── playwright.config.ts
 │   ├── postcss.config.mjs
 │   ├── README.md
 │   ├── tailwind.config.js

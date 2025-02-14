@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import browserAutomation from './browserAutomation';
+import { logger } from './logger';
 
 // Define schemas for validation
 const MessageSchema = z.object({
@@ -58,16 +59,27 @@ export class CommandParser {
       // Handle navigation commands
       const navigationMatch = content.match(COMMAND_PATTERNS.NAVIGATION);
       if (navigationMatch) {
-        // Extract URL from the matched content
-        const urlMatch = navigationMatch[1].match(URL_PATTERN);
-        if (!urlMatch) {
-          return {
-            success: false,
-            content: "Could not detect a valid URL in the command. Please include a website address.",
-            error: "INVALID_URL"
-          };
+        // Extract and clean the URL from the matched content
+        let targetUrl = navigationMatch[1]
+          // Remove leading prepositions and whitespace
+          .replace(/^(?:to|on|at|in)[\s'"]+/i, '')
+          // Remove any remaining quotes and whitespace
+          .replace(/['"]/g, '')
+          .trim();
+
+        // Log the initial cleaned URL
+        logger.debug('Initial cleaned URL:', targetUrl);
+        
+        // Handle common website names without full URL
+        if (!URL_PATTERN.test(targetUrl)) {
+          // Add .com if no TLD is present
+          if (!targetUrl.includes('.')) {
+            targetUrl += '.com';
+            logger.debug('Added .com to URL:', targetUrl);
+          }
         }
-        const url = this.normalizeUrl(urlMatch[0]);
+        
+        const url = this.normalizeUrl(targetUrl);
         return {
           success: true,
           content: `Initiating navigation to ${url}...`,
@@ -93,7 +105,7 @@ export class CommandParser {
             name: "run_browser_automation",
             arguments: {
               action: "type",
-              selector: 'input[type="search"], input[type="text"], textarea[name="q"]',
+              selector: '#search, input[type="search"], input[name="search_query"]',
               value: searchQuery,
               visible: true
             }
