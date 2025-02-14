@@ -1,9 +1,16 @@
 # Active Context
 
 ## Current Task
-Enhanced browser automation system with improved reliability, command chaining, and session management.
+Fixed AI response behavior to properly handle informational queries vs automation requests.
 
-## Recent Changes
+## Latest Changes
+- Implemented strict response protocol in system prompt to prioritize natural language
+- Added explicit rules for when browser automation can be used
+- Modified tool_choice logic to prevent unnecessary automation
+- Added response format requirements with DIRECT ANSWER/WEB ACTION prefixes
+- Enhanced prompt with comprehensive examples and clear triggers
+
+## Previous Changes
 - Disabled video recording by default to prevent unnecessary file creation
 - Increased session timeout from 30 seconds to 5 minutes
 - Implemented proper browser instance reuse within sessions
