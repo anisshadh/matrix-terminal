@@ -62,6 +62,9 @@ export class BrowserAutomation {
   }, 5000);
 
   private async generateStateHashes(page: Page): Promise<{ domHash: string; visualHash: string }> {
+    // Import crypto using dynamic import for ES modules
+    const crypto = await import('crypto');
+    
     const domContent = await page.content();
     const screenshot = await page.screenshot({ 
       type: 'png',
@@ -70,8 +73,8 @@ export class BrowserAutomation {
     });
     
     return {
-      domHash: require('crypto').createHash('sha256').update(domContent).digest('hex'),
-      visualHash: require('crypto').createHash('sha256').update(screenshot).digest('hex')
+      domHash: crypto.createHash('sha256').update(domContent).digest('hex'),
+      visualHash: crypto.createHash('sha256').update(screenshot).digest('hex')
     };
   }
 
@@ -95,12 +98,35 @@ export class BrowserAutomation {
     sessionId: string, 
     task: () => Promise<T>
   ): Promise<T> {
+    logger.debug('Starting quantum execution', {
+      sessionId,
+      queueSize: executionQueue.size,
+      hasExistingTask: executionQueue.has(sessionId),
+      timestamp: new Date().toISOString()
+    });
+
     if (executionQueue.has(sessionId)) {
+      logger.debug('Waiting for existing task to complete', { sessionId });
       await executionQueue.get(sessionId);
+      logger.debug('Previous task completed', { sessionId });
     }
+
+    const startTime = Date.now();
     const promise = task().finally(() => {
+      const duration = Date.now() - startTime;
+      logger.debug('Task execution completed', {
+        sessionId,
+        durationMs: duration,
+        timestamp: new Date().toISOString()
+      });
       executionQueue.delete(sessionId);
     });
+
+    logger.debug('Adding task to execution queue', { 
+      sessionId,
+      newQueueSize: executionQueue.size + 1
+    });
+    
     executionQueue.set(sessionId, promise as Promise<any>);
     return promise;
   }
@@ -108,43 +134,99 @@ export class BrowserAutomation {
   private async initBrowser(sessionId: string, retryCount = 0, maxRetries = 3): Promise<void> {
     try {
       this.currentSessionId = sessionId;
+      logger.debug('Starting browser initialization', { 
+        sessionId,
+        retryCount, 
+        maxRetries,
+        keepOpen: this.keepOpen,
+        timestamp: new Date().toISOString()
+      });
+      
       eventStore.addEvent(sessionId, {
         type: 'INIT',
         data: { retryCount, keepOpen: this.keepOpen }
       });
-      logger.debug('Initializing browser automation', { retryCount, keepOpen: this.keepOpen });
+
+      logger.debug('Checking for existing session', { sessionId });
 
       // Check for existing valid session
       const existingSession = BrowserAutomation.activeSessions.get(sessionId);
-      if (existingSession && 
-          Date.now() - existingSession.timestamp < BrowserAutomation.INACTIVITY_TIMEOUT) {
-        try {
-          if (!existingSession.page.isClosed() && existingSession.instance.isConnected()) {
-            this.browser = existingSession.instance;
-            this.page = existingSession.page;
-            await this.page.bringToFront();
-            logger.debug('Reusing existing browser session');
-            return;
+      if (existingSession) {
+        logger.debug('Found existing session', {
+          sessionId,
+          sessionAge: Date.now() - existingSession.timestamp,
+          timeout: BrowserAutomation.INACTIVITY_TIMEOUT
+        });
+        
+        if (Date.now() - existingSession.timestamp < BrowserAutomation.INACTIVITY_TIMEOUT) {
+          try {
+            const isClosed = await Promise.resolve().then(() => existingSession.page.isClosed()).catch(() => true);
+            const isConnected = await Promise.resolve().then(() => existingSession.instance.isConnected()).catch(() => false);
+            
+            logger.debug('Checking existing session state', {
+              sessionId,
+              isClosed,
+              isConnected
+            });
+            
+            if (!isClosed && isConnected) {
+              this.browser = existingSession.instance;
+              this.page = existingSession.page;
+              await this.page.bringToFront();
+              logger.debug('Successfully reused existing browser session', { sessionId });
+              return;
+            }
+          } catch (error) {
+            logger.debug('Error checking existing session', {
+              sessionId,
+              error: error instanceof Error ? error.message : 'Unknown error',
+              stack: error instanceof Error ? error.stack : undefined
+            });
+            BrowserAutomation.activeSessions.delete(sessionId);
           }
-        } catch (error) {
-          logger.debug('Error checking existing session, will create new one', error);
+        } else {
+          logger.debug('Existing session expired', {
+            sessionId,
+            age: Date.now() - existingSession.timestamp,
+            timeout: BrowserAutomation.INACTIVITY_TIMEOUT
+          });
           BrowserAutomation.activeSessions.delete(sessionId);
         }
       }
 
       // Close existing browser if it exists and we couldn't reuse it
       if (this.browser) {
+        logger.debug('Attempting to close existing browser instance', { sessionId });
         try {
           await this.browser.close();
+          logger.debug('Successfully closed existing browser instance', { sessionId });
         } catch (error) {
-          logger.debug('Error closing existing browser', error);
+          logger.debug('Error closing existing browser', {
+            sessionId,
+            error: error instanceof Error ? error.message : 'Unknown error',
+            stack: error instanceof Error ? error.stack : undefined
+          });
         }
         this.browser = null;
         this.page = null;
       }
 
-      logger.debug('Launching new browser instance');
+      logger.debug('Launching new browser instance', {
+        sessionId,
+        retryCount,
+        maxRetries,
+        args: [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--start-maximized',
+          '--disable-background-timer-throttling',
+          '--disable-backgrounding-occluded-windows',
+          '--disable-renderer-backgrounding'
+        ]
+      });
+      
       try {
+        const startTime = Date.now();
         this.browser = await chromium.launch({
           headless: false, // Always start visible for reliability
           args: [
@@ -156,10 +238,27 @@ export class BrowserAutomation {
             '--disable-renderer-backgrounding'
           ]
         });
+        logger.debug('Browser instance launched successfully', {
+          sessionId,
+          launchTime: Date.now() - startTime,
+          isConnected: await this.browser.isConnected()
+        });
       } catch (error) {
+        logger.error(
+          'Browser launch failed',
+          error instanceof Error ? error : new Error('Unknown error'),
+          { sessionId, retryCount }
+        );
+        
         if (retryCount < maxRetries) {
-          logger.warn(`Browser launch failed, retrying (${retryCount + 1}/${maxRetries})...`, error);
-          await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)));
+          const retryDelay = 1000 * (retryCount + 1);
+          logger.warn(`Retrying browser launch`, {
+            sessionId,
+            attempt: retryCount + 1,
+            maxRetries,
+            retryDelay
+          });
+          await new Promise(resolve => setTimeout(resolve, retryDelay));
           return this.initBrowser(sessionId, retryCount + 1, maxRetries);
         }
         throw error;
@@ -633,11 +732,28 @@ export class BrowserAutomation {
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      const errorDetails = {
+        action: params.action,
+        url: params.url,
+        selector: params.selector,
+        isPartOfChain,
+        sessionId,
+        pageUrl: this.page ? await Promise.resolve(this.page.url()).catch(() => 'unknown') : 'no page',
+        pageTitle: this.page ? await Promise.resolve(this.page.title()).catch(() => 'unknown') : 'no page',
+        timestamp: new Date().toISOString()
+      };
+      
       eventStore.addEvent(sessionId, {
         type: 'ERROR',
-        error: errorMessage
+        error: errorMessage,
+        data: errorDetails
       });
-      logger.error('Browser automation error:', error instanceof Error ? error : new Error(errorMessage));
+      
+      logger.error(
+        'Browser automation action failed',
+        error instanceof Error ? error : new Error(errorMessage),
+        errorDetails
+      );
       
       return {
         success: false,

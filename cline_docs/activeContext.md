@@ -1,67 +1,92 @@
 # Active Context
 
 ## Current Task
-Fixed AI response behavior to properly handle informational queries vs automation requests.
+Implemented comprehensive fix for browser use issues and command parsing.
 
 ## Latest Changes
-- Implemented strict response protocol in system prompt to prioritize natural language
-- Added explicit rules for when browser automation can be used
-- Modified tool_choice logic to prevent unnecessary automation
-- Added response format requirements with DIRECT ANSWER/WEB ACTION prefixes
-- Enhanced prompt with comprehensive examples and clear triggers
+- Added action-specific keyword sets for precise command recognition
+- Implemented confidence scoring system with contextual analysis
+- Added negative keywords to prevent false positives
+- Enhanced response formatting with DIRECT ANSWER/WEB ACTION prefixes
+- Improved question detection and handling
+- Added confidence thresholds for browser actions
+- Enhanced error messages and clarification prompts
 
 ## Previous Changes
-- Disabled video recording by default to prevent unnecessary file creation
-- Increased session timeout from 30 seconds to 5 minutes
-- Implemented proper browser instance reuse within sessions
-- Enhanced command chaining with natural language support
-- Improved error handling and type safety throughout the system
-- Added robust session cleanup mechanisms
-- Updated command parsing to handle complex chained commands
-
-## Previous Changes
-- Implemented comprehensive chunk validation system
-- Added robust error handling with custom error classes
-- Enhanced stream state management with retry mechanisms
-- Added temporal validation for processing order
-- Implemented shadow validation pipeline
-- Added cleanup mechanisms for stale sessions and streams
-- Removed test files after successful validation
+- Fixed browser automation system to handle ES modules and improve state management
+- Enhanced browser automation logging and state management
+- Implemented comprehensive visual state verification
+- Added detailed element property logging
+- Improved action chaining reliability
+- Enhanced error context and debugging capabilities
 
 ## Technical Improvements
-1. Browser Instance Management
-   - Session-based browser instance caching
-   - Configurable session timeouts (now 5 minutes)
-   - Automatic cleanup of inactive sessions
-   - Disabled video recording by default
-   - Improved browser state preservation
+1. Command Parsing System
+   - Action-specific keyword sets (primary/secondary)
+   - Confidence scoring with contextual analysis
+   - Negative keyword filtering
+   - Enhanced question detection
+   - Improved website shortcut handling
 
-2. Command Chaining
-   - Natural language command separation (then, and, comma, semicolon)
-   - Context isolation per command
-   - Sequential command execution
-   - State preservation between chained commands
-   - Enhanced command parsing with SmartCommandParser
+2. Response System
+   - Clear prefix system (DIRECT ANSWER/WEB ACTION)
+   - Confidence score display
+   - Enhanced clarification prompts
+   - Improved error messaging
+   - Context-aware responses
 
-3. Error Handling
-   - Type-safe command processing
-   - Improved error detection and reporting
-   - Proper session cleanup on errors
-   - Enhanced error context in logs
-   - Validation of automation parameters
+3. Browser Automation
+   - Confidence threshold enforcement
+   - Enhanced state management
+   - Improved action validation
+   - Better error handling
+   - Clearer user feedback
 
-4. Performance Optimizations
-   - Reduced resource usage by disabling video recording
-   - Optimized browser instance reuse
-   - Improved memory management
-   - Efficient command chain processing
+4. Error Prevention
+   - Negative keyword filtering
+   - Question pattern detection
+   - Confidence thresholds
+   - Enhanced validation
+   - Improved error context
+
+## Technical Improvements
+1. Browser Automation Core
+   - ES modules compatibility for crypto operations
+   - Enhanced state management between actions
+   - Comprehensive visual state verification
+   - Detailed element property logging
+   - Improved action chaining
+   - Robust error handling and debugging
+
+2. Logging and Debugging
+   - Detailed error context
+   - Visual state verification after actions
+   - Element property inspection
+   - Action timing metrics
+   - Queue management logging
+   - Session state tracking
+
+3. Action Chain Management
+   - Reliable state preservation between actions
+   - Visual verification between steps
+   - Enhanced error recovery
+   - Detailed action execution logs
+   - Improved session management
+
+4. Error Handling
+   - Comprehensive error context
+   - Visual state verification
+   - Element property validation
+   - Detailed failure logging
+   - Improved error recovery
+   - Enhanced debugging information
 
 ## Next Steps
-1. Monitor browser session management in production
-2. Consider implementing browser instance pooling for high-load scenarios
-3. Add support for more complex command patterns
-4. Consider implementing parallel command execution where appropriate
-5. Enhance debugging capabilities with detailed browser automation analytics
+1. Monitor browser automation reliability in production
+2. Consider implementing additional visual verification methods
+3. Enhance error recovery mechanisms
+4. Add support for more complex action patterns
+5. Consider implementing parallel action execution where appropriate
 
 ## Current Status
-The browser automation system now provides reliable command execution with proper session management, command chaining support, and comprehensive error handling. The system maintains browser state effectively throughout command chains and provides detailed debugging information when issues occur.
+The browser automation system now provides reliable execution of all core actions (navigation, clicking, typing) with comprehensive logging, state management, and error handling. The system maintains detailed logs of operations and verifies the visual state after each action, ensuring reliability and debuggability.

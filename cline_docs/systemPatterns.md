@@ -3,7 +3,7 @@
 ## Architecture Overview
 The system follows a modular architecture with clear separation of concerns:
 - Next.js backend for API handling and routing
-- Playwright for browser automation
+- Playwright for browser automation with ES modules support
 - OpenAI integration for AI-driven interactions
 - Stream processing with robust validation
 
@@ -46,6 +46,7 @@ The BrowserAutomation class implements a sophisticated singleton pattern with qu
 - Uses event listeners for comprehensive state tracking
 - Provides intelligent cleanup with resource management
 - Supports quantum-safe action chaining with state validation
+- Enhanced ES modules compatibility for crypto operations
 
 #### Key Patterns:
 1. Quantum-Safe Execution
@@ -53,6 +54,7 @@ The BrowserAutomation class implements a sophisticated singleton pattern with qu
    - Thread-safe operation queuing
    - State isolation between operations
    - Temporal consistency validation
+   - ES modules compatibility
 
 2. Visual State Management
    - DOM state snapshots and verification
@@ -60,6 +62,7 @@ The BrowserAutomation class implements a sophisticated singleton pattern with qu
    - Focus state maintenance
    - Element visibility tracking
    - Temporal consistency checks
+   - Enhanced element property logging
 
 3. Browser Context Management
    - Full HD resolution configuration
@@ -67,6 +70,7 @@ The BrowserAutomation class implements a sophisticated singleton pattern with qu
    - Window state preservation
    - Resource cleanup on session end
    - Intelligent session reuse
+   - Improved ES modules support
 
 4. Error Handling
    - Visual state capture on errors
@@ -74,23 +78,34 @@ The BrowserAutomation class implements a sophisticated singleton pattern with qu
    - State-aware error recovery
    - Chain-aware error handling
    - Detailed visual debugging
+   - Enhanced error context logging
 
 ### Command Processing
-The system uses a three-layer command processing architecture:
+The system uses a sophisticated three-layer command processing architecture with confidence scoring:
 
 1. SmartCommandParser
-   - Natural language command parsing
+   - Natural language command parsing with confidence scoring
+   - Action-specific keyword sets (primary/secondary weights)
+   - Negative keyword filtering for false positive prevention
    - Command chain separation using delimiters (then, and, comma, semicolon)
    - Context isolation per command
    - Intelligent URL and action detection
    - Website shortcut resolution
+   - Confidence threshold enforcement (0.6 minimum)
+   - Question pattern detection
+   - Enhanced contextual analysis
 
 2. CommandParser
    - Command validation and type safety
+   - Confidence score validation
+   - Response format management (DIRECT ANSWER/WEB ACTION)
    - Command execution orchestration
    - Chain execution management
    - Error handling and recovery
    - Result aggregation
+   - Enhanced clarification prompts
+   - Question handling
+   - Context-aware responses
 
 3. BrowserAutomation
    - Session-based browser management
@@ -98,15 +113,22 @@ The system uses a three-layer command processing architecture:
    - Resource cleanup and optimization
    - Error handling with visual verification
    - Performance optimization
+   - ES modules compatibility
+   - Enhanced visual state verification
+   - Detailed element property logging
 
 ### Action Chaining
-The system implements a sophisticated action chaining mechanism:
+The system implements a sophisticated action chaining mechanism with confidence validation:
 
 1. Chain Parsing
    - Natural language chain detection
    - Command separation and normalization
    - Context preservation between commands
    - Chain validation and optimization
+   - Enhanced state verification
+   - Confidence scoring per action
+   - Contextual confidence boosting
+   - Chain-wide confidence validation
 
 2. Chain Execution
    - Sequential command processing
@@ -114,6 +136,9 @@ The system implements a sophisticated action chaining mechanism:
    - Browser instance reuse within chains
    - Visibility state management
    - Error handling with chain awareness
+   - Improved visual verification
+   - Confidence threshold enforcement
+   - Enhanced error messaging
 
 3. Chain State Management
    - Session-based state tracking
@@ -121,6 +146,9 @@ The system implements a sophisticated action chaining mechanism:
    - Resource optimization
    - Cleanup strategy determination
    - Chain result aggregation
+   - Enhanced element property tracking
+   - Confidence score tracking
+   - Action validation state
 
 ### Logging System
 - Hierarchical logging with debug, info, and error levels
@@ -128,6 +156,8 @@ The system implements a sophisticated action chaining mechanism:
 - Performance monitoring capabilities
 - Chain-aware logging for multi-action sequences
 - Stream-aware logging for chunk processing
+- Enhanced element property logging
+- Detailed visual state verification logging
 
 ## Design Decisions
 
@@ -147,6 +177,7 @@ The system implements a sophisticated session-based browser management system:
    - Automatic cleanup of inactive sessions
    - Resource optimization
    - State preservation between requests
+   - ES modules compatibility
 
 2. Browser Instance Caching
    - Session-based instance storage
@@ -154,6 +185,7 @@ The system implements a sophisticated session-based browser management system:
    - State verification before reuse
    - Automatic cleanup of stale instances
    - Memory optimization
+   - Enhanced visual verification
 
 3. Resource Management
    - Disabled video recording by default
@@ -161,6 +193,7 @@ The system implements a sophisticated session-based browser management system:
    - Efficient cleanup strategies
    - Performance monitoring
    - Resource usage tracking
+   - Improved state verification
 
 ### Error Recovery
 - Automatic recovery from page crashes
@@ -168,6 +201,8 @@ The system implements a sophisticated session-based browser management system:
 - Fallback to new browser instance when needed
 - Chain-aware error handling with appropriate rollback
 - Stream-aware error handling with retry mechanisms
+- Enhanced error context logging
+- Detailed visual state verification
 
 ### Performance Optimization
 - Intelligent browser instance reuse
@@ -178,6 +213,7 @@ The system implements a sophisticated session-based browser management system:
 - Optimized visual verification
 - Efficient stream validation pipeline
 - Optimized cleanup intervals
+- ES modules compatibility
 
 ## Best Practices
 1. Always validate visual and DOM states before and after actions
@@ -195,6 +231,9 @@ The system implements a sophisticated session-based browser management system:
 13. Use shadow validation for critical operations
 14. Maintain proper stream state tracking
 15. Clean up stale resources automatically
+16. Ensure ES modules compatibility
+17. Log detailed element properties
+18. Verify visual state after each action
 
 ## Future Considerations
 1. Browser Management
@@ -203,6 +242,7 @@ The system implements a sophisticated session-based browser management system:
    - Enhance session management with clustering
    - Implement advanced caching strategies
    - Add sophisticated resource monitoring
+   - Enhance ES modules support
 
 2. Command Processing
    - Add support for more complex command patterns
@@ -210,6 +250,7 @@ The system implements a sophisticated session-based browser management system:
    - Enhance natural language parsing
    - Add command optimization strategies
    - Implement command analytics
+   - Improve state verification
 
 3. Performance Optimization
    - Implement browser instance pooling
@@ -217,6 +258,7 @@ The system implements a sophisticated session-based browser management system:
    - Enhance session management with clustering
    - Optimize resource usage patterns
    - Implement advanced caching strategies
+   - Enhance visual verification
 
 4. Monitoring and Analytics
    - Implement browser automation dashboard
@@ -224,3 +266,4 @@ The system implements a sophisticated session-based browser management system:
    - Enhance debugging capabilities
    - Add real-time monitoring
    - Implement usage analytics
+   - Enhanced visual state tracking

@@ -43,20 +43,35 @@ export class CommandParser {
       if (typeof command === 'string' && /^(hi|hello|hey|greetings)$/i.test(command)) {
         return {
           success: true,
-          content: "Greetings, user. Matrix connection established. Awaiting further instructions."
+          content: "DIRECT ANSWER: Greetings, human interface established. I am ready to provide information or perform web actions as instructed."
         };
       }
 
       // Handle browser automation command
-      const actionMessage = this.getActionMessage(command);
-      
+      if (command && command.confidence !== undefined) {
+        // If confidence is too low, return without browser action
+        if (command.confidence < 0.6) {
+          return {
+            success: true,
+            content: "DIRECT ANSWER: I understand your message, but I'm not confident that you want me to perform a browser action. Could you please clarify if you'd like me to use the browser?"
+          };
+        }
+
+        const actionMessage = this.getActionMessage(command);
+        return {
+          success: true,
+          content: `WEB ACTION: ${actionMessage}`,
+          toolCall: {
+            name: "run_browser_automation",
+            arguments: command
+          }
+        };
+      }
+
+      // For non-browser commands or unclear intent
       return {
         success: true,
-        content: actionMessage,
-        toolCall: {
-          name: "run_browser_automation",
-          arguments: command
-        }
+        content: "DIRECT ANSWER: I understand your message. Please let me know if you'd like me to perform any specific browser actions."
       };
     } catch (error) {
       logger.error('Command execution error:', error instanceof Error ? error : new Error('Unknown error'));
@@ -69,26 +84,27 @@ export class CommandParser {
   }
 
   private static getActionMessage(command: any): string {
+    const confidenceNote = command.confidence ? ` (Confidence: ${Math.round(command.confidence * 100)}%)` : '';
+    
     switch (command.action) {
       case 'navigate':
-        return `Initiating navigation to ${command.url}...`;
+        return `Navigating to ${command.url}${confidenceNote}`;
       case 'click':
-        return `Executing click on specified element...`;
+        return `Clicking on specified element${confidenceNote}`;
       case 'type':
-        return `Typing "${command.value}" into specified element...`;
+        return `Typing "${command.value}" into specified element${confidenceNote}`;
       default:
-        return 'Executing command...';
+        return `Executing command${confidenceNote}`;
     }
   }
 
-  // Keep this for backward compatibility
   static async parseAndExecuteCommand(content: string): Promise<CommandResult> {
     try {
       // Special case for greetings
       if (/^(hi|hello|hey|greetings)$/i.test(content)) {
         return {
           success: true,
-          content: "Greetings, user. Matrix connection established. Awaiting further instructions."
+          content: "DIRECT ANSWER: Greetings, human interface established. I am ready to provide information or perform web actions as instructed."
         };
       }
 
@@ -97,26 +113,46 @@ export class CommandParser {
 
       // If no actions were parsed
       if (actions.length === 0) {
+        // Check if it's a negative keyword match
+        const normalizedContent = content.trim().toLowerCase();
+        const isQuestion = /^(are|do|can|could|would|should|what|how|why|when|where|who)\s/.test(normalizedContent);
+        
+        if (isQuestion) {
+          return {
+            success: true,
+            content: "DIRECT ANSWER: I understand you're asking a question. I'll provide a direct response rather than performing any browser actions.",
+          };
+        }
+
         return {
-          success: false,
-          content: "Command not recognized. Please try rephrasing your request.",
-          error: "UNRECOGNIZED_COMMAND"
+          success: true,
+          content: "DIRECT ANSWER: I understand your message, but I'm not confident about performing any browser actions. Please let me know specifically if you'd like me to use the browser.",
+        };
+      }
+
+      // Check confidence of all actions
+      const lowConfidenceActions = actions.filter(action => (action.confidence ?? 0) < 0.6);
+      if (lowConfidenceActions.length > 0) {
+        return {
+          success: true,
+          content: "DIRECT ANSWER: I'm not completely confident about the browser actions you want me to perform. Could you please clarify your request?"
         };
       }
 
       // Execute all actions in sequence
       const responseMessages: string[] = [];
       const chainedActions = actions.map(action => {
+        const confidenceNote = action.confidence ? ` (Confidence: ${Math.round(action.confidence * 100)}%)` : '';
         let actionMessage = '';
         switch (action.action) {
           case 'navigate':
-            actionMessage = `Initiating navigation to ${action.url}...`;
+            actionMessage = `Navigating to ${action.url}${confidenceNote}`;
             break;
           case 'click':
-            actionMessage = `Executing click on specified element...`;
+            actionMessage = `Clicking on specified element${confidenceNote}`;
             break;
           case 'type':
-            actionMessage = `Typing "${action.value}" into specified element...`;
+            actionMessage = `Typing "${action.value}" into specified element${confidenceNote}`;
             break;
         }
         responseMessages.push(actionMessage);
@@ -124,7 +160,6 @@ export class CommandParser {
       });
 
       // Set visible=true for all actions in the chain except the last one
-      // This keeps the browser open between actions
       chainedActions.forEach((action, index) => {
         if (index < chainedActions.length - 1) {
           action.visible = true;
@@ -133,7 +168,7 @@ export class CommandParser {
 
       return {
         success: true,
-        content: responseMessages.join(' Then '),
+        content: `WEB ACTION: ${responseMessages.join(' Then ')}`,
         toolCall: {
           name: "run_browser_automation",
           arguments: {
