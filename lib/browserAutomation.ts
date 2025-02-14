@@ -776,7 +776,7 @@ export class BrowserAutomation {
           throw new Error('URL is required for navigate action');
         }
         if (!params.url.startsWith('http://') && !params.url.startsWith('https://')) {
-          throw new Error('URL must start with http:// or https://');
+          params.url = "https://" + params.url;
         }
         break;
 

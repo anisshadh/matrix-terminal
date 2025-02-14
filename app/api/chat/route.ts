@@ -295,22 +295,53 @@ export async function POST(req: Request) {
         const automationResult = await browserAutomation.execute(sessionId, params);
         logger.info('Browser automation result', { messageId, automationResult });
         
-        // Add the result to messages
-        apiMessages.push({
-          role: "assistant",
-          content: automationResult.success 
-            ? `Successfully completed browser action: ${automationResult.message}`
-            : `Browser automation failed: ${automationResult.error}`
-        });
-        
-        // Get a follow-up streaming response
-        response = await client.chat.completions.create({
-          model: "llama-3.3-70b-versatile",
-          messages: apiMessages,
-          temperature: 0.8,
-          stream: true,
-          n: 1
-        });
+        if (automationResult.success) {
+          // For successful automation, create immediate success response stream
+          const stream = new ReadableStream({
+            start(controller) {
+              const encoder = new TextEncoder();
+              
+              // Send success message
+              const message = {
+                id: messageId,
+                role: "assistant",
+                content: `WEB ACTION: ${automationResult.message}`,
+                createdAt: new Date().toISOString(),
+              };
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify(message)}\n\n`));
+              
+              // Send done marker
+              controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+              controller.close();
+            }
+          });
+
+          return new Response(stream, {
+            headers: {
+              "Content-Type": "text/event-stream",
+              "Cache-Control": "no-cache, no-transform",
+              "Connection": "keep-alive",
+              "X-Content-Type-Options": "nosniff",
+              "Access-Control-Allow-Origin": "*",
+              "X-Automation-Session": sessionId,
+            },
+          });
+        } else {
+          // For failed automation, add error to messages and continue with chat
+          apiMessages.push({
+            role: "assistant",
+            content: `Browser automation failed: ${automationResult.error}`
+          });
+          
+          // Get error response stream
+          response = await client.chat.completions.create({
+            model: "llama-3.3-70b-versatile",
+            messages: apiMessages,
+            temperature: 0.8,
+            stream: true,
+            n: 1
+          });
+        }
       } catch (error) {
         const automationError = new AutomationError(
           'Browser automation failed',

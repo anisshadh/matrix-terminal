@@ -14,7 +14,7 @@ export interface AutomationAction {
 // Schema for validating parsed actions
 const AutomationActionSchema = z.object({
   action: z.enum(['navigate', 'click', 'type']),
-  url: z.string().url().optional(),
+  url: z.string().min(1).optional(),
   selector: z.string().optional(),
   value: z.string().optional(),
   visible: z.boolean().optional(),
