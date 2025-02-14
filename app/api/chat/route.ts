@@ -4,6 +4,7 @@ import { ChatError, ValidationError, AutomationError, StreamError } from "@/lib/
 import { CommandParser } from "@/lib/commandParser";
 import { logger } from "@/lib/logger";
 import browserAutomation from "@/lib/browserAutomation";
+import { eventStore } from "@/lib/eventStore";
 
 type ChatRole = 'user' | 'assistant' | 'system';
 type ChatMessage = { role: ChatRole; content: string };
@@ -285,6 +286,12 @@ export async function POST(req: Request) {
                 // Only process valid chunks with content
                 const content = chunk.choices?.[0]?.delta?.content;
                 if (content) {
+                  // Process chunk through eventStore
+                  const isValid = await eventStore.processChunk(messageId, chunk);
+                  if (!isValid) {
+                    throw new StreamError('Chunk validation failed', messageId);
+                  }
+
                   fullContent += content;
                   
                   // Send the current state
@@ -339,6 +346,9 @@ export async function POST(req: Request) {
               
               // Always send DONE marker
               controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+              
+              // Clear stream state
+              eventStore.clearStream(messageId);
             } catch (error) {
               const streamError = new StreamError(
                 'Error sending final messages',
@@ -369,6 +379,9 @@ export async function POST(req: Request) {
             };
             controller.enqueue(encoder.encode(`data: ${JSON.stringify(errorMessage)}\n\n`));
             controller.close();
+            
+            // Clean up stream state on error
+            eventStore.clearStream(messageId);
           }
         };
 
@@ -418,6 +431,9 @@ export async function POST(req: Request) {
         errorMessage = "Invalid or missing API key";
       }
     }
+
+    // Clean up any stream state on error
+    eventStore.clearStream(messageId);
 
     return new Response(
       JSON.stringify({ 
