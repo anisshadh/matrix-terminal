@@ -11,6 +11,35 @@ interface BrowserState {
   domHash: string;
   visualHash: string;
   timestamp: number;
+  status: 'idle' | 'busy' | 'error';
+  chainId?: string;
+  retryCount: number;
+  lastError?: Error;
+  isLocked: boolean;
+}
+
+class AsyncMutex {
+  private locked: boolean = false;
+  private waitQueue: Array<() => void> = [];
+
+  async acquire(): Promise<void> {
+    if (!this.locked) {
+      this.locked = true;
+      return;
+    }
+    return new Promise<void>(resolve => {
+      this.waitQueue.push(resolve);
+    });
+  }
+
+  release(): void {
+    if (this.waitQueue.length > 0) {
+      const resolve = this.waitQueue.shift()!;
+      resolve();
+    } else {
+      this.locked = false;
+    }
+  }
 }
 
 interface BrowserAutomationParams {
@@ -19,9 +48,13 @@ interface BrowserAutomationParams {
   selector?: string;
   value?: string;
   visible?: boolean;
+  chainId?: string;
+  chainIndex?: number;
+  isLastInChain?: boolean;
 }
 
-// Execution queue for quantum-safe action sequencing
+// Session management and execution control
+const sessionMutex = new AsyncMutex();
 const executionQueue = new Map<string, Promise<void>>();
 
 interface AutomationResult {
@@ -97,39 +130,71 @@ export class BrowserAutomation {
 
   private async quantumExecute<T>(
     sessionId: string, 
-    task: () => Promise<T>
+    task: () => Promise<T>,
+    options: { retryOnLock?: boolean; timeout?: number } = {}
   ): Promise<T> {
+    const { retryOnLock = true, timeout = 30000 } = options;
+    
     logger.debug('Starting quantum execution', {
       sessionId,
       queueSize: executionQueue.size,
-      hasExistingTask: executionQueue.has(sessionId),
-      timestamp: new Date().toISOString()
+      hasExistingTask: executionQueue.has(sessionId)
     });
 
-    if (executionQueue.has(sessionId)) {
-      logger.debug('Waiting for existing task to complete', { sessionId });
-      await executionQueue.get(sessionId);
-      logger.debug('Previous task completed', { sessionId });
-    }
-
-    const startTime = Date.now();
-    const promise = task().finally(() => {
-      const duration = Date.now() - startTime;
-      logger.debug('Task execution completed', {
-        sessionId,
-        durationMs: duration,
-        timestamp: new Date().toISOString()
-      });
-      executionQueue.delete(sessionId);
-    });
-
-    logger.debug('Adding task to execution queue', { 
-      sessionId,
-      newQueueSize: executionQueue.size + 1
-    });
+    // Acquire session mutex
+    await sessionMutex.acquire();
     
-    executionQueue.set(sessionId, promise as Promise<any>);
-    return promise;
+    try {
+      // Check if session is locked
+      const session = BrowserAutomation.activeSessions.get(sessionId);
+      if (session?.isLocked) {
+        if (!retryOnLock) {
+          throw new Error('Session is locked');
+        }
+        // Wait for session to unlock with timeout
+        await new Promise<void>((resolve, reject) => {
+          const start = Date.now();
+          const checkLock = () => {
+            const session = BrowserAutomation.activeSessions.get(sessionId);
+            if (!session?.isLocked) {
+              resolve();
+            } else if (Date.now() - start > timeout) {
+              reject(new Error('Session lock timeout'));
+            } else {
+              setTimeout(checkLock, 100);
+            }
+          };
+          checkLock();
+        });
+      }
+
+      // Lock session
+      if (session) {
+        session.isLocked = true;
+        BrowserAutomation.activeSessions.set(sessionId, session);
+      }
+
+      // Execute task with timeout
+      const result = await Promise.race([
+        task(),
+        new Promise<never>((_, reject) => 
+          setTimeout(() => reject(new Error('Task timeout')), timeout)
+        )
+      ]);
+
+      return result;
+    } finally {
+      // Unlock session and release mutex
+      const session = BrowserAutomation.activeSessions.get(sessionId);
+      if (session) {
+        session.isLocked = false;
+        BrowserAutomation.activeSessions.set(sessionId, session);
+      }
+      sessionMutex.release();
+      
+      // Remove from execution queue
+      executionQueue.delete(sessionId);
+    }
   }
 
   private async initBrowser(sessionId: string, retryCount = 0, maxRetries = 3): Promise<void> {
@@ -342,7 +407,10 @@ export class BrowserAutomation {
         actionChain: [],
         domHash,
         visualHash,
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        status: 'idle',
+        retryCount: 0,
+        isLocked: false
       });
     } catch (error) {
       const errorMessage = `Failed to initialize browser: ${error instanceof Error ? error.message : 'Unknown error'}`;
@@ -410,7 +478,17 @@ export class BrowserAutomation {
     }
   }
 
-  public async execute(sessionId: string, params: BrowserAutomationParams | { actions: BrowserAutomationParams[] }): Promise<AutomationResult> {
+  public async execute(
+    sessionId: string, 
+    params: BrowserAutomationParams | { 
+      actions: BrowserAutomationParams[],
+      chainMetadata?: {
+        id: string;
+        totalActions: number;
+        keepWindowOpen: boolean;
+      }
+    }
+  ): Promise<AutomationResult> {
     logger.info('Executing browser automation', params);
     eventStore.createSession(sessionId);
     
@@ -419,48 +497,55 @@ export class BrowserAutomation {
         // Handle array of actions
         if ('actions' in params) {
           const results: AutomationResult[] = [];
-          const isLastActionVisible = params.actions[params.actions.length - 1].visible === true;
+          const chainMetadata = params.chainMetadata;
           
-          // Set keepOpen true for the entire chain if the last action is visible
-          this.keepOpen = isLastActionVisible;
+          // Always keep window open during chain execution
+          this.keepOpen = true;
           
-          // Initialize browser for the chain
-          await this.initBrowser(sessionId);
+          // Initialize browser for the chain if not already running
+          let sessionState = BrowserAutomation.activeSessions.get(sessionId);
           
-          if (!this.page) {
-            throw new Error('Failed to initialize browser page');
+          if (!sessionState || !sessionState.instance.isConnected()) {
+            await this.initBrowser(sessionId);
+            sessionState = BrowserAutomation.activeSessions.get(sessionId);
+            if (!sessionState) {
+              throw new Error('Failed to initialize browser session');
+            }
+          }
+
+          // Update chain metadata
+          if (chainMetadata) {
+            sessionState.chainId = chainMetadata.id;
+            BrowserAutomation.activeSessions.set(sessionId, sessionState);
           }
           
-          // Get current session state
-          const sessionState = BrowserAutomation.activeSessions.get(sessionId);
-          if (!sessionState) {
-            throw new Error('Session state not found');
-          }
-          
-          for (let i = 0; i < params.actions.length; i++) {
-            const action = params.actions[i];
-            const isLastAction = i === params.actions.length - 1;
-            
+          // Execute each action in the chain
+          for (const action of params.actions) {
             // Execute action with state validation
-            const result = await this.executeSingleAction(sessionId, action, !isLastAction || isLastActionVisible);
+            const result = await this.executeSingleAction(sessionId, action, true);
             results.push(result);
             
             if (!result.success) {
-              if (!this.keepOpen) {
+              // On failure, only close if explicitly requested
+              if (chainMetadata?.keepWindowOpen === false) {
                 await this.cleanup(sessionId);
               }
               return result;
             }
             
             // Update session state after successful action
-            const { domHash, visualHash } = await this.generateStateHashes(this.page);
+            const { domHash, visualHash } = await this.generateStateHashes(this.page!);
             const updatedState: BrowserState = {
               ...sessionState,
               lastAction: action.action,
               actionChain: [...sessionState.actionChain, action],
               domHash,
               visualHash,
-              timestamp: Date.now()
+              timestamp: Date.now(),
+              status: action.isLastInChain ? 'idle' : 'busy',
+              retryCount: sessionState.retryCount,
+              isLocked: false,
+              chainId: action.chainId
             };
             
             // Validate temporal consistency
@@ -470,7 +555,8 @@ export class BrowserAutomation {
             BrowserAutomation.activeSessions.set(sessionId, updatedState);
           }
           
-          if (!this.keepOpen) {
+          // Only cleanup if explicitly requested to not keep window open
+          if (chainMetadata?.keepWindowOpen === false) {
             await this.cleanup(sessionId);
           }
           
@@ -480,21 +566,38 @@ export class BrowserAutomation {
           };
         }
         
-        // Handle single action
-        this.keepOpen = params.visible === true;
-        await this.initBrowser(sessionId);
-        
-        if (!this.page) {
-          throw new Error('Failed to initialize browser page');
-        }
-        
-        const result = await this.executeSingleAction(sessionId, params, false);
-        
-        if (!this.keepOpen) {
-          await this.cleanup(sessionId);
-        }
-        
-        return result;
+          // Handle single action
+          this.keepOpen = params.visible === true;
+          
+          // Get or create session state
+          let sessionState = BrowserAutomation.activeSessions.get(sessionId);
+          if (sessionState) {
+            // Update existing session
+            sessionState.status = 'busy';
+            BrowserAutomation.activeSessions.set(sessionId, sessionState);
+          }
+          
+          await this.initBrowser(sessionId);
+          
+          if (!this.page) {
+            throw new Error('Failed to initialize browser page');
+          }
+          
+          const result = await this.executeSingleAction(sessionId, params, false);
+          
+          // Update session state after action
+          sessionState = BrowserAutomation.activeSessions.get(sessionId);
+          if (sessionState) {
+            sessionState.status = 'idle';
+            sessionState.timestamp = Date.now();
+            BrowserAutomation.activeSessions.set(sessionId, sessionState);
+          }
+          
+          if (!this.keepOpen) {
+            await this.cleanup(sessionId);
+          }
+          
+          return result;
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
         eventStore.addEvent(sessionId, {
@@ -724,17 +827,70 @@ export class BrowserAutomation {
           await inputElement.fill(params.value);
           await this.verifyVisualState(sessionId, 'type');
           
-          // Optional: Press Enter if it's a search input
-          if (params.selector.includes('search') || params.value.toLowerCase().includes('search')) {
-            logger.debug('Search input detected, pressing Enter');
+          // Handle keyboard input
+          if (params.value === 'Enter') {
+            logger.debug('Pressing Enter key');
             if (!this.page) {
               throw new Error('Browser page not initialized');
             }
-            await this.page.keyboard.press('Enter');
-            // Wait for navigation if needed
-            await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {
-              logger.debug('No navigation occurred after pressing Enter');
-            });
+            
+            // Focus the input element first
+            if (inputElement) {
+              await inputElement.focus();
+              
+              // Get the form element if this input is part of a form
+              const formElement = await inputElement.evaluate(input => {
+                const form = input.closest('form');
+                return form ? true : false;
+              });
+              
+              if (formElement) {
+                // If in a form, use form submission which is more reliable
+                await Promise.all([
+                  inputElement.evaluate(input => {
+                    const form = input.closest('form');
+                    if (form) form.submit();
+                  }),
+                  Promise.race([
+                    this.page.waitForNavigation({ timeout: 10000 }).catch(() => {}),
+                    this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {})
+                  ])
+                ]);
+              } else {
+                // If not in a form, use keyboard press
+                await Promise.all([
+                  this.page.keyboard.press('Enter'),
+                  Promise.race([
+                    this.page.waitForNavigation({ timeout: 10000 }).catch(() => {}),
+                    this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {})
+                  ])
+                ]);
+              }
+            }
+          } else if (inputElement) {
+            // Regular text input
+            await inputElement.click();
+            await inputElement.fill('');
+            await inputElement.fill(params.value);
+            
+            // Auto-press Enter for search inputs
+            if (params.selector.includes('search') || params.value.toLowerCase().includes('search')) {
+              logger.debug('Search input detected, pressing Enter');
+              if (!this.page) {
+                throw new Error('Browser page not initialized');
+              }
+              
+              // Press Enter and wait for navigation
+              await Promise.all([
+                this.page.keyboard.press('Enter'),
+                Promise.race([
+                  this.page.waitForNavigation({ timeout: 10000 }).catch(() => {}),
+                  this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {})
+                ])
+              ]);
+            }
+          } else {
+            throw new Error('Input element not found or not accessible');
           }
           
           eventStore.addEvent(sessionId, {

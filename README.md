@@ -21,10 +21,11 @@ A cutting-edge Matrix-themed chat interface that combines AI-powered conversatio
   - Enhanced error handling and recovery
 
 - **AI Integration**
-  - Groq API with LLaMA 3.3 70B model
+  - OpenRouter AI with Claude 3.5 Sonnet model
   - Intelligent response system
   - Context-aware command processing
   - Real-time streaming responses
+  - Function calling capabilities
 
 ## 🚀 Getting Started
 
@@ -33,7 +34,7 @@ A cutting-edge Matrix-themed chat interface that combines AI-powered conversatio
 - Node.js (Latest LTS version recommended)
 - npm (Node Package Manager)
 - A modern web browser (Chromium-based recommended for automation features)
-- Groq API key for AI functionality
+- OpenRouter API key for AI functionality
 
 ### Installation
 
@@ -51,7 +52,8 @@ npm install --legacy-peer-deps
 3. Set up environment variables:
 Create a `.env.local` file in the root directory:
 ```env
-GROQ_API_KEY=your_api_key_here
+OPENROUTER_API_KEY=your_api_key_here
+SITE_URL=your_site_url_here  # Optional, defaults to localhost:3000
 ```
 
 4. Start the development server:
@@ -119,7 +121,7 @@ Matrix Terminal provides powerful browser automation features:
 
 - **Backend**
   - Next.js API routes
-  - Groq API integration
+  - OpenRouter AI integration
   - Playwright for browser automation
 
 - **Development Tools**
@@ -133,7 +135,7 @@ Matrix Terminal provides powerful browser automation features:
 ### Core Dependencies
 - next (14.2.16)
 - react & react-dom (18+)
-- openai (for Groq API)
+- openai (for OpenRouter AI compatibility)
 - tailwindcss
 - shadcn/ui components
 - playwright (for browser automation)

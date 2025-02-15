@@ -2,7 +2,7 @@
 
 ## Overview
 
-The AI Browser Automation System is a sophisticated tool that enables natural language control of web browsers. It combines smart command parsing with reliable browser automation to provide a seamless user experience.
+The AI Browser Automation System is a sophisticated tool that enables natural language control of web browsers, powered by OpenRouter AI's Claude model for intelligent command processing and reliable browser automation.
 
 ## Core Value Proposition
 
@@ -11,14 +11,23 @@ The AI Browser Automation System is a sophisticated tool that enables natural la
 - Reliable command execution
 - Safe and predictable behavior
 - Clear feedback and error messages
+- High-quality AI responses
 
 ### For Developers
 - Clean, maintainable codebase
 - Strong type safety
 - Comprehensive documentation
 - Reliable testing
+- Robust API integration
 
 ## Key Features
+
+### AI Integration
+- OpenRouter AI powered
+- Claude 3.5 Sonnet model
+- Streaming responses
+- Function calling support
+- Matrix-themed interactions
 
 ### Command Processing
 ```typescript
@@ -110,9 +119,9 @@ const COMMAND_TRIGGERS = {
 ## Product Goals
 
 ### Short Term
-1. Maintain reliability
-2. Monitor performance
-3. Gather feedback
+1. Monitor API performance
+2. Gather user feedback
+3. Track reliability
 4. Update documentation
 
 ### Medium Term
@@ -150,9 +159,9 @@ const COMMAND_TRIGGERS = {
 ## Maintenance
 
 ### Regular Tasks
-- Monitor logs
+- Monitor API performance
 - Update docs
-- Check performance
+- Check system health
 - Test functionality
 
 ### Updates

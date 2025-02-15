@@ -9,6 +9,9 @@ export interface AutomationAction {
   value?: string;
   visible?: boolean;
   confidence?: number;
+  chainId?: string;
+  chainIndex?: number;
+  isLastInChain?: boolean;
 }
 
 // Schema for validating parsed actions
@@ -18,7 +21,10 @@ const AutomationActionSchema = z.object({
   selector: z.string().optional(),
   value: z.string().optional(),
   visible: z.boolean().optional(),
-  confidence: z.number().min(0).max(1).optional()
+  confidence: z.number().min(0).max(1).optional(),
+  chainId: z.string().optional(),
+  chainIndex: z.number().optional(),
+  isLastInChain: z.boolean().optional()
 });
 
 // Action-specific keyword sets

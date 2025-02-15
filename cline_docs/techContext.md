@@ -7,6 +7,12 @@
 - ES6+ features for modern JavaScript functionality
 - Strict type checking enabled
 
+### API Integration
+- OpenRouter AI for language model
+- OpenAI-compatible API
+- Streaming support
+- Function calling capabilities
+
 ### Browser Automation
 - Playwright for browser control
 - Puppeteer-compatible API
@@ -58,7 +64,8 @@ const COMMAND_TRIGGERS = {
 - Zod
 
 ### Environment Variables
-- GROQ_API_KEY for API access
+- OPENROUTER_API_KEY for API access
+- SITE_URL for OpenRouter configuration
 - Other configuration in .env.local
 
 ### Development Commands
@@ -110,17 +117,17 @@ npm run test    # Run test suite
 
 ## Recent Updates
 
+### API Integration
+- Switched to OpenRouter AI
+- Enhanced streaming reliability
+- Improved error handling
+- Added required headers
+
 ### Command Processing
 - Added explicit command triggers
-- Removed partial matching
 - Enhanced confidence calculation
 - Improved validation
-
-### Browser Control
-- Better state management
-- Enhanced error handling
-- Improved recovery
-- Better validation
+- Better error messages
 
 ### Event System
 - Better event tracking
@@ -131,7 +138,7 @@ npm run test    # Run test suite
 ## Future Considerations
 
 ### Technical Debt
-- None currently after recent refactor
+- None currently after API migration
 - System is clean and maintainable
 - Well-documented patterns
 - Strong type safety

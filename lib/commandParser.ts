@@ -159,20 +159,34 @@ export class CommandParser {
         return action;
       });
 
-      // Set visible=true for all actions in the chain except the last one
-      chainedActions.forEach((action, index) => {
-        if (index < chainedActions.length - 1) {
-          action.visible = true;
-        }
+      // Set visible=true for all actions to maintain window persistence
+      chainedActions.forEach(action => {
+        action.visible = true;
       });
 
+      // Generate a unique chain ID
+      const chainId = crypto.randomUUID();
+
+      // Add chain metadata to each action
+      chainedActions.forEach((action, index) => {
+        action.chainId = chainId;
+        action.chainIndex = index;
+        action.isLastInChain = index === chainedActions.length - 1;
+      });
+
+      // Package actions with chain metadata
       return {
         success: true,
         content: `WEB ACTION: ${responseMessages.join(' Then ')}`,
         toolCall: {
           name: "run_browser_automation",
           arguments: {
-            actions: chainedActions
+            actions: chainedActions,
+            chainMetadata: {
+              id: chainId,
+              totalActions: chainedActions.length,
+              keepWindowOpen: true // Force window to stay open during chain execution
+            }
           }
         }
       };

@@ -12,8 +12,13 @@ type ChatMessage = { role: ChatRole; content: string };
 export const runtime = "nodejs";
 
 const client = new OpenAI({
-  apiKey: process.env.GROQ_API_KEY,
-  baseURL: "https://api.groq.com/openai/v1",
+  apiKey: process.env.OPENROUTER_API_KEY,
+  baseURL: "https://openrouter.ai/api/v1",
+  defaultHeaders: {
+    "HTTP-Referer": process.env.SITE_URL || "http://localhost:3000",
+    "X-Title": "Matrix AI Terminal",
+    "Content-Type": "application/json"
+  }
 });
 
 export async function OPTIONS() {
@@ -32,8 +37,8 @@ export async function POST(req: Request) {
   const sessionId = crypto.randomUUID();
   logger.info('Received chat request', { messageId });
 
-  if (!process.env.GROQ_API_KEY) {
-    const error = new ChatError('GROQ_API_KEY not configured', messageId);
+  if (!process.env.OPENROUTER_API_KEY) {
+    const error = new ChatError('OPENROUTER_API_KEY not configured', messageId);
     logger.error(error.message, error);
     return new Response(
       JSON.stringify({ error: error.message }),
@@ -143,7 +148,7 @@ export async function POST(req: Request) {
       }
     }
 
-    // Filter out any messages with 'name' field as it's not supported by Groq
+    // Filter out any messages with 'name' field as it's not supported by the API
     const apiMessages: ChatMessage[] = [
       {
         role: "system",
@@ -178,7 +183,7 @@ export async function POST(req: Request) {
     logger.debug('Starting chat completion', { messageId, messageCount: apiMessages.length });
 
     let response = await client.chat.completions.create({
-      model: "llama-3.3-70b-versatile",
+      model: "anthropic/claude-3.5-sonnet",
       messages: apiMessages,
       temperature: 0.8,
       stream: true,
@@ -225,7 +230,7 @@ export async function POST(req: Request) {
 
     // For non-streaming request to check for tool calls
     const toolCheckResponse = await client.chat.completions.create({
-      model: "llama-3.3-70b-versatile",
+      model: "anthropic/claude-3.5-sonnet",
       messages: apiMessages,
       temperature: 0.8,
       stream: false,
@@ -335,7 +340,7 @@ export async function POST(req: Request) {
           
           // Get error response stream
           response = await client.chat.completions.create({
-            model: "llama-3.3-70b-versatile",
+            model: "anthropic/claude-3.5-sonnet",
             messages: apiMessages,
             temperature: 0.8,
             stream: true,
@@ -512,7 +517,7 @@ export async function POST(req: Request) {
         errorMessage = "Temperature must be a float32 > 0 and <= 2";
       } else if (error.message.includes("model")) {
         statusCode = 400;
-        errorMessage = "Invalid model specified. Please use llama-3.3-70b-versatile";
+        errorMessage = "Invalid model specified. Please use anthropic/claude-3.5-sonnet";
       } else if (error.message.includes("api_key")) {
         statusCode = 401;
         errorMessage = "Invalid or missing API key";
